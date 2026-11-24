@@ -1,0 +1,1991 @@
+"use client";
+import { useEffect, useState } from "react";
+import {
+  ArrowDownToLine,
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  Check,
+  ChevronDown,
+  Heart,
+  House,
+  LayoutGrid,
+  MapPin,
+  Plus,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Wallet,
+  Columns3,
+  X,
+  ShieldCheck,
+  MoveUpRight,
+  Upload,
+  Trash2,
+} from "lucide-react";
+import { Modal } from "./dialog";
+import {
+  Property,
+  Preferences,
+  Finance,
+  defaults,
+  initialProperty,
+  newProperty,
+  money,
+  documentation,
+  entry,
+  recurring,
+  score,
+  requirements,
+  criteria,
+  cashflow,
+  cashLabels,
+  backupSchema,
+  preferencesSchema,
+  validateFinance,
+  propertySchema,
+} from "@/lib/domain";
+import { supabase } from "@/lib/supabase";
+import { AttachmentCover } from "./attachment-cover";
+import { PropertyAttachments } from "./property-attachments";
+import {
+  propertyLocation,
+  locationOptions,
+  matchesLocation,
+} from "@/lib/locations";
+import { packFiles, restoreFiles, syncFiles } from "@/lib/attachments";
+const STORAGE = "nosso-lar-v1";
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  ...rest
+}: {
+  label: string;
+  value: string | number | null;
+  onChange: (v: string) => void;
+  type?: string;
+  min?: number;
+  max?: number;
+  step?: string;
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input
+        {...rest}
+        type={type}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={type === "number" ? "Não informado" : ""}
+        min={type === "number" ? 0 : undefined}
+        step={type === "number" ? "any" : undefined}
+      />
+    </label>
+  );
+}
+function Metric({
+  label,
+  value,
+  help,
+}: {
+  label: string;
+  value: string;
+  help?: string;
+}) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {help && <small>{help}</small>}
+    </div>
+  );
+}
+function Placeholder() {
+  return (
+    <div className="architecture" aria-hidden="true">
+      <div className="arch-building">
+        <i />
+        <i />
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="arch-line" />
+      <span>AINDA SEM FOTO</span>
+    </div>
+  );
+}
+export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
+  const [properties, setProperties] = useState<Property[]>([]),
+    [prefs, setPrefs] = useState(defaults),
+    [ready, setReady] = useState(false),
+    [tab, setTab] = useState("Imóveis"),
+    [filter, setFilter] = useState("Todos"),
+    [search, setSearch] = useState(""),
+    [sort, setSort] = useState("Favoritos"),
+    [cityFilter, setCityFilter] = useState(""),
+    [neighborhoodFilter, setNeighborhoodFilter] = useState(""),
+    [more, setMore] = useState(false),
+    [draft, setDraft] = useState<Property | null>(null),
+    [section, setSection] = useState("Visão geral"),
+    [isNew, setIsNew] = useState(false),
+    [settings, setSettings] = useState(false),
+    [tempPrefs, setTempPrefs] = useState(defaults),
+    [selected, setSelected] = useState<string[]>([]),
+    [financialId, setFinancialId] = useState(""),
+    [start, setStart] = useState(() =>
+      new Date().toLocaleDateString("sv-SE").slice(0, 7),
+    ),
+    [month, setMonth] = useState(0),
+    [notice, setNotice] = useState(""),
+    [email, setEmail] = useState(""),
+    [user, setUser] = useState(""),
+    [busy, setBusy] = useState(false),
+    [aiOpen, setAiOpen] = useState(false),
+    [aiText, setAiText] = useState(""),
+    [aiPreview, setAiPreview] = useState<Record<
+      string,
+      { valor: string | number | null; origem: string; confianca: string }
+    > | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE);
+      if (raw) {
+        const data = backupSchema.parse(JSON.parse(raw));
+        setProperties(data.properties);
+        setPrefs(data.preferences);
+      } else setProperties([initialProperty()]);
+    } catch {
+      setNotice(
+        "Não foi possível ler os dados locais. Importe um backup; o arquivo original foi preservado.",
+      );
+    }
+    setReady(true);
+    supabase?.auth
+      .getUser()
+      .then(({ data }) => setUser(data.user?.email ?? ""));
+    const sub = supabase?.auth.onAuthStateChange((_event, session) =>
+      setUser(session?.user.email ?? ""),
+    );
+    return () => sub?.data.subscription.unsubscribe();
+  }, []);
+  const persist = (ps: Property[], pr = prefs) => {
+    try {
+      localStorage.setItem(
+        STORAGE,
+        JSON.stringify({ version: 1, properties: ps, preferences: pr }),
+      );
+      setProperties(ps);
+      setPrefs(pr);
+      return true;
+    } catch {
+      setNotice(
+        "Sem espaço ou acesso ao armazenamento. Exporte seus dados antes de sair.",
+      );
+      return false;
+    }
+  };
+  const open = (p: Property, fresh = false, s = "Visão geral") => {
+    setDraft(structuredClone(p));
+    setIsNew(fresh);
+    setSection(s);
+  };
+  const save = () => {
+    if (!draft) return;
+    const parsed = propertySchema.safeParse(draft);
+    const err = validateFinance(draft);
+    if (!parsed.success || err) {
+      setNotice(
+        err ??
+          "Confira os campos. Informe pelo menos um nome e use valores válidos.",
+      );
+      return;
+    }
+    if (
+      persist(
+        isNew
+          ? [...properties, draft]
+          : properties.map((p) => (p.id === draft.id ? draft : p)),
+      )
+    ) {
+      setDraft(null);
+      setNotice("Pronto, guardamos este imóvel.");
+    }
+  };
+  const update = (key: keyof Property, value: unknown) =>
+    setDraft((p) => (p ? { ...p, [key]: value } : p));
+  const fin = (key: keyof Finance, value: unknown) =>
+    setDraft((p) =>
+      p ? { ...p, finance: { ...p.finance, [key]: value } } : p,
+    );
+  const number = (v: string) => (v === "" ? null : Number(v));
+  const exportData = async () => {
+    try {
+      const files = await packFiles(properties);
+      const url = URL.createObjectURL(
+        new Blob(
+          [
+            JSON.stringify(
+              { version: 1, properties, preferences: prefs, files },
+              null,
+              2,
+            ),
+          ],
+          { type: "application/json" },
+        ),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "nosso-lar-backup.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setNotice("Cópia completa salva, incluindo os anexos.");
+    } catch (e) {
+      setNotice(
+        e instanceof Error ? e.message : "Não foi possível criar a cópia.",
+      );
+    }
+  };
+  const cloud = async (direction: "push" | "pull") => {
+    if (!supabase) return;
+    setBusy(true);
+    try {
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      if (!u) throw Error("Entre por e-mail primeiro.");
+      if (direction === "push") {
+        const { data: householdId, error: accessError } =
+          await supabase.rpc("ensure_household");
+        if (accessError || !householdId)
+          throw Error(
+            "Não conseguimos abrir nosso espaço. Confira a configuração da conta.",
+          );
+        const synced = await syncFiles(properties, householdId);
+        const { error } = await supabase.rpc("save_household", {
+          payload: { version: 1, properties: synced, preferences: prefs },
+        });
+        if (error) throw error;
+        persist(synced);
+        setNotice("Cópia salva na sua conta.");
+      } else {
+        const { data, error } = await supabase.rpc("load_household");
+        if (error) throw error;
+        if (!data) throw Error("Ainda não há uma cópia na nuvem.");
+        const parsed = backupSchema.parse(data);
+        if (
+          confirm(
+            "Trazer os imóveis e preferências que guardamos na conta? Isso substitui a versão deste aparelho.",
+          )
+        ) {
+          persist(parsed.properties, parsed.preferences);
+          setNotice("Cópia da nuvem carregada.");
+        }
+      }
+    } catch (e) {
+      setNotice(
+        e instanceof Error
+          ? e.message
+          : "Nuvem indisponível. Seus dados locais estão preservados.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const visible = properties
+    .filter(
+      (p) =>
+        (p.name + " " + propertyLocation(p))
+          .toLowerCase()
+          .includes(search.toLowerCase()) &&
+        matchesLocation(p, cityFilter, neighborhoodFilter) &&
+        (filter === "Todos" ||
+          (filter === "Favoritos" && p.favorite) ||
+          (filter === "Prontos" && p.type === "Pronto") ||
+          (filter === "Na planta" && p.type === "Na planta") ||
+          (filter === "Visitados" && p.status === "Visitado") ||
+          (filter === "Em avaliação" && p.status === "Em avaliação")),
+    )
+    .sort((a, b) => {
+      if (sort === "Favoritos") return Number(b.favorite) - Number(a.favorite);
+      const val = (p: Property) =>
+        sort === "Menor preço"
+          ? p.price
+          : sort === "Menor entrada"
+            ? entry(p)
+            : sort === "Menor mensalidade"
+              ? recurring(p)
+              : score(p, prefs).value;
+      const av = val(a),
+        bv = val(b);
+      return av === null
+        ? 1
+        : bv === null
+          ? -1
+          : sort === "Melhor nota"
+            ? bv - av
+            : av - bv;
+    });
+  const locationFilters = (
+    <div className="location-filters">
+      <label>
+        Cidade
+        <select
+          aria-label="Filtrar por cidade"
+          value={cityFilter}
+          onChange={(e) => {
+            setCityFilter(e.target.value);
+            setNeighborhoodFilter("");
+          }}
+        >
+          <option value="">Todas as cidades</option>
+          {locationOptions(properties, "city").map(([key, label]) => (
+            <option value={key} key={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Bairro
+        <select
+          aria-label="Filtrar por bairro"
+          value={neighborhoodFilter}
+          onChange={(e) => setNeighborhoodFilter(e.target.value)}
+        >
+          <option value="">Todos os bairros</option>
+          {locationOptions(properties, "neighborhood", cityFilter).map(
+            ([key, label]) => (
+              <option value={key} key={key}>
+                {label}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      {(cityFilter || neighborhoodFilter) && (
+        <button
+          className="text-button"
+          onClick={() => {
+            setCityFilter("");
+            setNeighborhoodFilter("");
+          }}
+        >
+          Limpar localização <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+  const current = properties.find((p) => p.id === financialId) ?? properties[0];
+  const flow = current ? cashflow(current, start) : null;
+  const toggle = (id: string) =>
+    setSelected((v) =>
+      v.includes(id)
+        ? v.filter((x) => x !== id)
+        : v.length < 3
+          ? [...v, id]
+          : v,
+    );
+  const comparison = properties.filter((p) => selected.includes(p.id));
+  const safeLink = (s: string) => /^https?:\/\//i.test(s);
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <a href="/" className="brand">
+          <span className="brand-icon">
+            <House size={22} />
+          </span>
+          nosso lar<span className="brand-dot">.</span>
+        </a>
+        <div className="workspace">
+          <span className="eyebrow">SÓ NÓS DOIS</span>
+          <p>Nossa busca, nosso ritmo.</p>
+        </div>
+        <nav aria-label="Navegação principal">
+          {[
+            { name: "Imóveis", icon: LayoutGrid },
+            { name: "Comparar", icon: Columns3 },
+            { name: "Finanças", icon: Wallet },
+          ].map(({ name, icon: Icon }) => (
+            <button
+              key={name}
+              aria-label={name}
+              aria-current={tab === name ? "page" : undefined}
+              className={tab === name ? "nav-item active" : "nav-item"}
+              onClick={() => setTab(name)}
+            >
+              <Icon size={19} />
+              <span>{name}</span>
+              {name === "Imóveis" && <small>{properties.length}</small>}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="private">
+            <ShieldCheck size={18} />
+            <div>
+              Nosso cantinho.<small>Guardado neste aparelho</small>
+            </div>
+          </div>
+          <button
+            className="nav-item"
+            onClick={() => {
+              setTempPrefs(structuredClone(prefs));
+              setSettings(true);
+            }}
+          >
+            <Settings2 size={18} />
+            Preferências
+          </button>
+          <div className="profile">
+            <span>N</span>
+            <div>
+              Nosso primeiro lar<small>Um passo de cada vez</small>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <main>
+        <div className="topbar">
+          <span>Nosso primeiro lar</span>
+          <span>
+            <span className="status-dot" /> Só nosso
+            <button
+              className="icon-button mobile-settings"
+              aria-label="Preferências"
+              onClick={() => {
+                setTempPrefs(structuredClone(prefs));
+                setSettings(true);
+              }}
+            >
+              <Settings2 size={18} />
+            </button>
+          </span>
+        </div>
+        <div className="page">
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">
+                {tab === "Imóveis"
+                  ? "NOSSA BUSCA"
+                  : tab === "Comparar"
+                    ? "LADO A LADO"
+                    : "NOSSOS PLANOS"}
+              </div>
+              <h1>
+                {tab === "Imóveis"
+                  ? "Nossos imóveis"
+                  : tab === "Comparar"
+                    ? "Qual combina mais com a gente?"
+                    : "Como fica no nosso bolso?"}
+              </h1>
+              <p>
+                {tab === "Imóveis"
+                  ? "As opções que estamos considerando para morar juntos."
+                  : tab === "Comparar"
+                    ? "Vamos olhar com calma o que muda de um lugar para o outro."
+                    : "A entrada, as parcelas e o que precisamos reservar."}
+              </p>
+            </div>
+            {tab === "Imóveis" && (
+              <button
+                className="primary"
+                onClick={() => open(newProperty(), true)}
+              >
+                <Plus size={18} />
+                Adicionar imóvel
+              </button>
+            )}
+          </div>
+          {!ready ? (
+            <div className="skeleton">Preparando seu espaço…</div>
+          ) : (
+            <>
+              {tab === "Imóveis" && (
+                <>
+                  <div className="private-note">
+                    <span className="note-mark">
+                      <House size={22} />
+                    </span>
+                    <div>
+                      <strong>Nosso próximo endereço</strong>
+                      <p>
+                        {properties.length === 1
+                          ? "Por enquanto, temos 1 imóvel na nossa lista."
+                          : `Temos ${properties.length} imóveis na nossa lista.`}{" "}
+                        Sem pressa, vamos escolhendo juntos.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="collection-title">
+                    <h2>
+                      Nossa lista{" "}
+                      <span>
+                        {properties.length.toString().padStart(2, "0")}
+                      </span>
+                    </h2>
+                    {aiEnabled && (
+                      <button
+                        className="text-button"
+                        onClick={() => setAiOpen(true)}
+                      >
+                        Importar anúncio com IA <ArrowUpRight size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="toolbar">
+                    <div className="filters">
+                      {[
+                        "Todos",
+                        "Favoritos",
+                        "Em avaliação",
+                        ...(more ? ["Visitados", "Prontos", "Na planta"] : []),
+                      ].map((f) => (
+                        <button
+                          className={filter === f ? "chip selected" : "chip"}
+                          key={f}
+                          onClick={() => setFilter(f)}
+                        >
+                          {f === "Favoritos" && <Heart size={13} />} {f}
+                        </button>
+                      ))}
+                      <button
+                        className="icon-button"
+                        aria-label="Mais filtros"
+                        onClick={() => setMore(!more)}
+                      >
+                        <SlidersHorizontal size={16} />
+                      </button>
+                    </div>
+                    <div className="search-sort">
+                      <label className="search">
+                        <Search size={16} />
+                        <input
+                          aria-label="Buscar imóvel"
+                          placeholder="Buscar imóvel"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </label>
+                      <select
+                        aria-label="Ordenar imóveis"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                      >
+                        {[
+                          "Favoritos",
+                          "Menor preço",
+                          "Melhor nota",
+                          "Menor entrada",
+                          "Menor mensalidade",
+                        ].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {locationFilters}
+                  <div className="property-grid">
+                    {visible.map((p) => (
+                      <article className="property-card" key={p.id}>
+                        <div className="photo">
+                          {p.photo && safeLink(p.photo) ? (
+                            <img src={p.photo} alt={p.name} />
+                          ) : (
+                            <AttachmentCover
+                              file={p.attachments.find((f) =>
+                                f.mime.startsWith("image/"),
+                              )}
+                              name={p.name}
+                              fallback={<Placeholder />}
+                            />
+                          )}
+                          <span className="badge photo-badge">
+                            {p.type ?? "Tipo a confirmar"}
+                          </span>
+                          <button
+                            className={
+                              "favorite " + (p.favorite ? "favorited" : "")
+                            }
+                            aria-label={
+                              p.favorite
+                                ? "Remover favorito"
+                                : "Favoritar imóvel"
+                            }
+                            onClick={() =>
+                              persist(
+                                properties.map((x) =>
+                                  x.id === p.id
+                                    ? { ...x, favorite: !x.favorite }
+                                    : x,
+                                ),
+                              )
+                            }
+                          >
+                            <Heart
+                              size={17}
+                              fill={p.favorite ? "currentColor" : "none"}
+                            />
+                          </button>
+                        </div>
+                        <button className="card-main" onClick={() => open(p)}>
+                          <div className="card-status">
+                            <span className="status-dot" />
+                            {p.status}
+                            <ArrowUpRight size={17} />
+                          </div>
+                          <h3>{p.name}</h3>
+                          <p className="location">
+                            <MapPin size={14} />
+                            {propertyLocation(p)}
+                          </p>
+                          <strong className="price">{money(p.price)}</strong>
+                          <div className="specs">
+                            <span>
+                              {p.area !== null
+                                ? `${p.area} m²`
+                                : "Área pendente"}
+                            </span>
+                            <span>
+                              {p.rooms !== null
+                                ? `${p.rooms} quartos`
+                                : "Quartos pendentes"}
+                            </span>
+                            <span>
+                              {p.parking !== null
+                                ? `${p.parking} vagas`
+                                : "Vagas pendentes"}
+                            </span>
+                          </div>
+                          <div className="card-footer">
+                            <span>
+                              {score(p, prefs).complete
+                                ? `Nota ${score(p, prefs).value?.toFixed(0)}/100`
+                                : "Ainda temos coisas para conhecer"}
+                            </span>
+                            <span>
+                              Ver imóvel <ArrowRight size={14} />
+                            </span>
+                          </div>
+                        </button>
+                      </article>
+                    ))}
+                    <button
+                      className="add-card"
+                      onClick={() => open(newProperty(), true)}
+                    >
+                      <span>
+                        <Plus size={24} />
+                      </span>
+                      <h3>Mais um lugar para conhecer</h3>
+                      <p>
+                        Guarde um imóvel que chamou
+                        <br />a atenção de vocês.
+                      </p>
+                      <b>
+                        Guardar na nossa lista <ArrowRight size={15} />
+                      </b>
+                    </button>
+                  </div>
+                  {!visible.length && (
+                    <p className="muted">
+                      Nenhum imóvel por aqui. Adicione uma opção ou ajuste os
+                      filtros.
+                    </p>
+                  )}
+                  <div className="bottom-note">
+                    <ShieldCheck size={17} />
+                    <p>
+                      Cada informação no seu tempo.{" "}
+                      <span>Comece com o que sabe e complete depois.</span>
+                    </p>
+                  </div>
+                </>
+              )}
+              {tab === "Comparar" && (
+                <>
+                  <div className="section-label">
+                    SELECIONE DE 2 A 3 IMÓVEIS{" "}
+                    <span>{selected.length}/3 selecionados</span>
+                  </div>
+                  {locationFilters}
+                  <p className="selection-context">
+                    Os filtros ajudam a encontrar opções; os imóveis já
+                    selecionados continuam na comparação.
+                  </p>
+                  <div className="selection-row">
+                    {properties
+                      .filter((p) =>
+                        matchesLocation(p, cityFilter, neighborhoodFilter),
+                      )
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          className={
+                            "select-card " +
+                            (selected.includes(p.id) ? "chosen" : "")
+                          }
+                          onClick={() => toggle(p.id)}
+                          disabled={
+                            selected.length === 3 && !selected.includes(p.id)
+                          }
+                        >
+                          <Building2 size={22} />
+                          <div>
+                            <strong>{p.name}</strong>
+                            <small>{money(p.price)}</small>
+                          </div>
+                          <span className="checkbox">
+                            {selected.includes(p.id) && <Check size={14} />}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                  {comparison.length < 2 ? (
+                    <div className="empty">
+                      <Columns3 size={36} />
+                      <h2>Uma escolha merece perspectiva.</h2>
+                      <p>
+                        Selecione dois imóveis para comparar custos, espaços e
+                        avaliações.
+                      </p>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setTab("Imóveis");
+                          open(newProperty(), true);
+                        }}
+                      >
+                        <Plus size={16} />
+                        Adicionar outra opção
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="comparison-grid">
+                      {comparison.map((p) => {
+                        const s = score(p, prefs);
+                        const allComplete = comparison.every(
+                          (x) => score(x, prefs).complete,
+                        );
+                        const best = allComplete
+                          ? Math.max(
+                              ...comparison.map((x) => score(x, prefs).value!),
+                            )
+                          : null;
+                        return (
+                          <article className="compare-card" key={p.id}>
+                            <span className="eyebrow">
+                              {p.type ?? "TIPO PENDENTE"}
+                            </span>
+                            <h2>{p.name}</h2>
+                            {best !== null && s.value === best && (
+                              <span className="badge">
+                                {comparison.filter(
+                                  (x) => score(x, prefs).value === best,
+                                ).length > 1
+                                  ? "Empate na avaliação"
+                                  : "Melhor avaliado"}
+                              </span>
+                            )}
+                            <p className="muted">{requirements(p, prefs)}</p>
+                            {[
+                              ["Preço", money(p.price)],
+                              [
+                                "Área privativa",
+                                p.area === null
+                                  ? "Não informado"
+                                  : `${p.area} m²`,
+                              ],
+                              [
+                                "Preço por m²",
+                                p.price && p.area
+                                  ? money(p.price / p.area)
+                                  : "Não informado",
+                              ],
+                              [
+                                "Quartos / banheiros / suítes / vagas",
+                                [p.rooms, p.baths, p.suites, p.parking]
+                                  .map((v) => v ?? "—")
+                                  .join(" / "),
+                              ],
+                              [
+                                "Disponibilidade",
+                                p.delivery || "Não informado",
+                              ],
+                              ["Entrada em dinheiro", money(entry(p))],
+                              ["Mensal recorrente", money(recurring(p))],
+                              [
+                                "Avaliação",
+                                s.complete
+                                  ? `${s.value?.toFixed(1)} / 100`
+                                  : `Provisória · ${s.coverage}% completa`,
+                              ],
+                            ].map(([l, v]) => (
+                              <div className="compare-line" key={l}>
+                                <span>{l}</span>
+                                <strong>{v}</strong>
+                              </div>
+                            ))}
+                            {[
+                              "Localização e conforto",
+                              "Condomínio",
+                              "Custos e obra",
+                              "Riscos e pendências",
+                            ].map((name, i) => (
+                              <details key={name}>
+                                <summary>{name}</summary>
+                                <p>
+                                  {i === 0
+                                    ? propertyLocation(p)
+                                    : i === 1
+                                      ? `Condomínio: ${money(p.finance.condo)}`
+                                      : i === 2
+                                        ? `Documentação: ${money(documentation(p))}. Obra: ${money(p.finance.construction)}`
+                                        : p.notes ||
+                                          "Registre observações e confirme informações na visita."}
+                                </p>
+                              </details>
+                            ))}
+                            <p className="small muted">
+                              {s.complete
+                                ? "Nota ponderada pelas preferências de vocês; maior nota indica maior avaliação consensual."
+                                : "A nota final só aparece ao completar os critérios; informações ausentes não valem zero."}
+                            </p>
+                            <button
+                              className="text-button"
+                              onClick={() => open(p)}
+                            >
+                              Abrir ficha <ArrowRight size={15} />
+                            </button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+              {tab === "Finanças" &&
+                (current && flow ? (
+                  <>
+                    <div className="finance-selector">
+                      <label>
+                        Planejamento de
+                        <select
+                          aria-label="Imóvel do planejamento"
+                          value={current.id}
+                          onChange={(e) => setFinancialId(e.target.value)}
+                        >
+                          {properties.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="secondary"
+                        onClick={() => open(current, false, "Custos")}
+                      >
+                        <Settings2 size={16} />
+                        Ajustar custos
+                      </button>
+                    </div>
+                    <div className="metrics">
+                      <Metric
+                        label="Para adquirir / entrar"
+                        value={money(
+                          entry(current) === null ||
+                            documentation(current) === null
+                            ? null
+                            : entry(current)! + documentation(current)!,
+                        )}
+                        help="Entrada em dinheiro + documentação"
+                      />
+                      <Metric
+                        label="Prestação informada"
+                        value={money(current.finance.payment)}
+                        help="Da sua simulação de financiamento"
+                      />
+                      <Metric
+                        label="Custo mensal recorrente"
+                        value={money(recurring(current))}
+                        help={
+                          recurring(current) === null
+                            ? "Prestação + condomínio + IPTU"
+                            : `${((recurring(current)! / prefs.income) * 100).toFixed(1)}% da renda de referência`
+                        }
+                      />
+                      <Metric
+                        label="Documentação"
+                        value={money(documentation(current))}
+                        help={
+                          current.finance.docMode === "estimate"
+                            ? "Estimativa de 6% do preço"
+                            : "Valor informado · substitui a estimativa"
+                        }
+                      />
+                    </div>
+                    <section className="chart-panel">
+                      <div className="chart-heading">
+                        <div>
+                          <span className="eyebrow">UM MÊS DE CADA VEZ</span>
+                          <h2>O que vamos reservar por mês</h2>
+                        </div>
+                        <Field
+                          label="Início do planejamento"
+                          type="month"
+                          value={start}
+                          onChange={(v) => {
+                            if (v) setStart(v);
+                          }}
+                        />
+                      </div>
+                      {flow.pending.length > 0 && (
+                        <div className="pending">
+                          <span className="status-dot" />
+                          <p>
+                            <strong>Planejamento parcial</strong> · Confirme{" "}
+                            {flow.pending.join(", ").toLowerCase()}. As barras
+                            mostram apenas valores com mês definido.
+                          </p>
+                        </div>
+                      )}
+                      <div
+                        className="chart"
+                        aria-label="Fluxo de caixa em 12 meses"
+                      >
+                        {flow.months.map((m, i) => (
+                          <button
+                            key={m.key}
+                            className={
+                              "chart-column " + (i === month ? "focused" : "")
+                            }
+                            onClick={() => setMonth(i)}
+                            aria-label={`${m.label}: ${money(m.total)} em valores conhecidos`}
+                          >
+                            <span className="bar-track">
+                              <span
+                                className="bar"
+                                style={{
+                                  height: `${m.total ? Math.max(3, (m.total / Math.max(...flow.months.map((x) => x.total), 1)) * 100) : 0}%`,
+                                }}
+                              >
+                                {m.values.map(
+                                  (v, j) =>
+                                    v > 0 && (
+                                      <i
+                                        key={j}
+                                        style={{
+                                          height: `${(v / m.total) * 100}%`,
+                                          background: `var(--cash-${j})`,
+                                        }}
+                                      />
+                                    ),
+                                )}
+                              </span>
+                            </span>
+                            <span className="month-label">
+                              {m.label.split("/")[0]}
+                              <small>{m.label.split("/")[1]}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="legend">
+                        {cashLabels.map((l, i) => (
+                          <span key={l}>
+                            <i style={{ background: `var(--cash-${i})` }} />
+                            {l}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="month-detail">
+                        <div>
+                          <span className="eyebrow">
+                            {flow.months[month].label}
+                          </span>
+                          <h3>
+                            {flow.months[month].total === 0 &&
+                            flow.pending.length
+                              ? "Pendente"
+                              : money(flow.months[month].total)}
+                          </h3>
+                          <small>
+                            {flow.pending.length
+                              ? "Subtotal conhecido · há pendências"
+                              : "Total previsto"}
+                          </small>
+                        </div>
+                        <div className="month-breakdown">
+                          {flow.months[month].values.map(
+                            (v, i) =>
+                              v > 0 && (
+                                <p key={i}>
+                                  {cashLabels[i]}
+                                  <strong>{money(v)}</strong>
+                                </p>
+                              ),
+                          )}
+                          {flow.months[month].total === 0 && (
+                            <p>Nenhum pagamento informado para este mês.</p>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                    <details className="finance-references">
+                      <summary>Nossas referências para este plano</summary>
+                      <p>
+                        Renda de referência: {money(prefs.income)}. Teto do
+                        imóvel: {money(prefs.ceiling)}.
+                      </p>
+                      <p>
+                        Estes valores ajudam a organizar nossa escolha. A carta
+                        de crédito de R$ 400 mil não define o financiamento
+                        aprovado; a prestação vem da nossa simulação real.
+                      </p>
+                    </details>
+                  </>
+                ) : (
+                  <div className="empty">
+                    <Wallet size={36} />
+                    <h2>Vamos escolher um imóvel primeiro.</h2>
+                    <button
+                      className="primary"
+                      onClick={() => open(newProperty(), true)}
+                    >
+                      Adicionar imóvel
+                    </button>
+                  </div>
+                ))}
+            </>
+          )}
+          <footer className="page-footer">
+            <span>nosso lar.</span>
+            <span>Só nosso.</span>
+          </footer>
+        </div>
+      </main>
+      {notice && (
+        <div className="toast" role="status">
+          <span>{notice}</span>
+          <button aria-label="Dispensar aviso" onClick={() => setNotice("")}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {draft && (
+        <Modal
+          title={isNew ? "Mais um lugar para conhecer" : draft.name}
+          description={
+            isNew
+              ? "Comece pelo que você sabe. Os detalhes podem vir depois."
+              : "Tudo o que estamos guardando sobre este lugar."
+          }
+          onClose={() => {
+            if (
+              confirm(
+                "Fechar a ficha? Alterações não salvas serão descartadas.",
+              )
+            )
+              setDraft(null);
+          }}
+        >
+          <div className="dialog-body">
+            {!isNew && (
+              <div className="tabs">
+                {["Visão geral", "Avaliação", "Custos"].map((s) => (
+                  <button
+                    key={s}
+                    className={section === s ? "selected" : ""}
+                    onClick={() => setSection(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {section === "Visão geral" && (
+              <>
+                <div className="form-grid">
+                  <Field
+                    label="Nome ou apelido do imóvel"
+                    value={draft.name}
+                    onChange={(v) => update("name", v)}
+                  />
+                  <label className="field">
+                    <span>Tipo de imóvel</span>
+                    <select
+                      value={draft.type ?? ""}
+                      onChange={(e) => update("type", e.target.value || null)}
+                    >
+                      <option value="">A confirmar</option>
+                      {["Pronto", "Em obra", "Na planta"].map((v) => (
+                        <option key={v}>{v}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Field
+                    label="Preço anunciado (R$)"
+                    type="number"
+                    value={draft.price}
+                    onChange={(v) => update("price", number(v))}
+                  />
+                  <Field
+                    label="Área privativa (m²)"
+                    type="number"
+                    value={draft.area}
+                    onChange={(v) => update("area", number(v))}
+                  />
+                  <Field
+                    label="Cidade"
+                    value={draft.city}
+                    onChange={(v) => update("city", v)}
+                  />
+                  <Field
+                    label="Bairro"
+                    value={draft.neighborhood}
+                    onChange={(v) => update("neighborhood", v)}
+                  />
+                  {draft.location && (
+                    <p className="legacy-location">
+                      Localização salva anteriormente: {draft.location}.
+                      Complete cidade e bairro para usar os filtros.
+                    </p>
+                  )}
+                  <div className="compact-fields">
+                    {[
+                      ["rooms", "Quartos"],
+                      ["baths", "Banheiros"],
+                      ["parking", "Vagas"],
+                    ].map(([key, label]) => (
+                      <Field
+                        key={key}
+                        label={label}
+                        type="number"
+                        value={draft[key as "rooms"]}
+                        onChange={(v) =>
+                          update(key as keyof Property, number(v))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+                <details>
+                  <summary>Link do anúncio e detalhes opcionais</summary>
+                  <div className="form-grid">
+                    <Field
+                      label="Link original do anúncio"
+                      type="url"
+                      value={draft.url}
+                      onChange={(v) => update("url", v)}
+                    />
+                    <Field
+                      label="URL da foto real do anúncio"
+                      type="url"
+                      value={draft.photo}
+                      onChange={(v) => update("photo", v)}
+                    />
+                    <Field
+                      label="Endereço"
+                      value={draft.address}
+                      onChange={(v) => update("address", v)}
+                    />
+                    <Field
+                      label="Suítes"
+                      type="number"
+                      value={draft.suites}
+                      onChange={(v) => update("suites", number(v))}
+                    />
+                    <Field
+                      label="Andar"
+                      value={draft.floor}
+                      onChange={(v) => update("floor", v)}
+                    />
+                    <Field
+                      label="Posição solar"
+                      value={draft.sun}
+                      onChange={(v) => update("sun", v)}
+                    />
+                    {draft.type !== "Pronto" && (
+                      <Field
+                        label="Previsão de entrega"
+                        type="month"
+                        value={draft.delivery}
+                        onChange={(v) => update("delivery", v)}
+                      />
+                    )}
+                    <label className="field">
+                      <span>Status</span>
+                      <select
+                        value={draft.status}
+                        onChange={(e) => update("status", e.target.value)}
+                      >
+                        {[
+                          "Rascunho",
+                          "Em avaliação",
+                          "Visitado",
+                          "Descartado",
+                        ].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {(["balcony", "elevator"] as const).map((k, i) => (
+                      <label className="field" key={k}>
+                        <span>{i ? "Elevador" : "Varanda"}</span>
+                        <select
+                          value={draft[k] === null ? "" : String(draft[k])}
+                          onChange={(e) =>
+                            update(
+                              k,
+                              e.target.value === ""
+                                ? null
+                                : e.target.value === "true",
+                            )
+                          }
+                        >
+                          <option value="">A confirmar</option>
+                          <option value="true">Sim</option>
+                          <option value="false">Não</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  {safeLink(draft.url) && (
+                    <a
+                      className="text-button"
+                      href={draft.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir anúncio <ArrowUpRight size={14} />
+                    </a>
+                  )}
+                </details>
+                {!isNew && (
+                  <details>
+                    <summary>Nossas anotações e a visita</summary>
+                    <label className="field">
+                      <span>
+                        O que chamou a atenção? O que falta confirmar?
+                      </span>
+                      <textarea
+                        value={draft.notes}
+                        onChange={(e) => update("notes", e.target.value)}
+                      />
+                    </label>
+                    {[
+                      "Conferir documentação",
+                      "Visitar o imóvel",
+                      "Verificar ruídos e iluminação",
+                      "Conferir estado das instalações",
+                    ].map((c) => (
+                      <label className="check-label" key={c}>
+                        <input
+                          type="checkbox"
+                          checked={draft.checklist.includes(c)}
+                          onChange={(e) =>
+                            update(
+                              "checklist",
+                              e.target.checked
+                                ? [...draft.checklist, c]
+                                : draft.checklist.filter((x) => x !== c),
+                            )
+                          }
+                        />
+                        {c}
+                      </label>
+                    ))}
+                  </details>
+                )}
+                <PropertyAttachments
+                  files={draft.attachments}
+                  onChange={(files) => update("attachments", files)}
+                  onNotice={setNotice}
+                  otherBytes={properties
+                    .filter((p) => p.id !== draft.id)
+                    .reduce(
+                      (total, p) =>
+                        total + p.attachments.reduce((n, f) => n + f.size, 0),
+                      0,
+                    )}
+                />
+                <div className="hint">
+                  {draft.price && draft.area
+                    ? `${money(draft.price / draft.area)} / m²`
+                    : "O preço por m² aparecerá quando a área for informada."}
+                </div>
+              </>
+            )}
+            {section === "Avaliação" && (
+              <>
+                <div className="assessment-intro">
+                  <h3>O que achamos deste lugar?</h3>
+                  <p>
+                    Conversem e registrem uma única nota por critério. De 0 (não
+                    atende) a 10 (atende totalmente); em riscos, 10 significa
+                    menor risco percebido.
+                  </p>
+                  <span className="badge">
+                    {score(draft, prefs).complete
+                      ? `${score(draft, prefs).value?.toFixed(1)} / 100`
+                      : `Provisória · ${score(draft, prefs).coverage}% completa`}
+                  </span>
+                </div>
+                {criteria.map((c, i) => (
+                  <div className="rating" key={c}>
+                    <div>
+                      <strong>{c}</strong>
+                      <small>
+                        Peso {prefs.weights[i]}%
+                        {i === 0
+                          ? " · Compare com seu orçamento e simulação real"
+                          : ""}
+                      </small>
+                    </div>
+                    <select
+                      aria-label={`Nota de ${c}`}
+                      value={draft.ratings[i] ?? ""}
+                      onChange={(e) =>
+                        update(
+                          "ratings",
+                          draft.ratings.map((r, j) =>
+                            j === i ? number(e.target.value) : r,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="">Avaliar depois</option>
+                      {Array.from({ length: 11 }, (_, j) => (
+                        <option key={j} value={j}>
+                          {j}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <p className="hint">
+                  A nota é a soma de cada avaliação × seu peso ÷ 10. Critérios
+                  pendentes não recebem zero e não geram uma nota final.
+                </p>
+              </>
+            )}
+            {section === "Custos" && (
+              <>
+                <div className="hint">
+                  Valores em reais. Deixe em branco o que não sabe; digite 0
+                  apenas quando confirmar que não há cobrança ou uso.
+                </div>
+                <h3>Entrada e financiamento</h3>
+                <div className="form-grid">
+                  {(
+                    [
+                      ["financed", "Financiamento informado"],
+                      ["fgts", "FGTS aplicado"],
+                      ["subsidy", "Subsídio confirmado"],
+                      ["payment", "Prestação da simulação"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <Field
+                      key={key}
+                      label={label}
+                      type="number"
+                      value={draft.finance[key]}
+                      onChange={(v) => fin(key, number(v))}
+                    />
+                  ))}
+                  <Field
+                    label="Mês da entrada / sinal"
+                    type="month"
+                    value={draft.finance.entryMonth}
+                    onChange={(v) => fin("entryMonth", v)}
+                  />
+                  <Field
+                    label="Início da prestação"
+                    type="month"
+                    value={draft.finance.paymentMonth}
+                    onChange={(v) => fin("paymentMonth", v)}
+                  />
+                </div>
+                <div className="inline-total">
+                  Entrada em dinheiro<strong>{money(entry(draft))}</strong>
+                </div>
+                <label className="check-label">
+                  <input
+                    type="checkbox"
+                    checked={draft.finance.split}
+                    onChange={(e) => fin("split", e.target.checked)}
+                  />
+                  Entrada parcelada
+                </label>
+                {draft.finance.split && (
+                  <div className="form-grid">
+                    <Field
+                      label="Sinal (pago no mês inicial)"
+                      type="number"
+                      value={draft.finance.deposit}
+                      onChange={(v) => fin("deposit", number(v))}
+                    />
+                    <Field
+                      label="Início das parcelas (se diferente do sinal)"
+                      type="month"
+                      value={draft.finance.installmentMonth}
+                      onChange={(v) => fin("installmentMonth", v)}
+                    />
+                    <Field
+                      label="Quantidade de parcelas do saldo"
+                      type="number"
+                      value={draft.finance.installments}
+                      onChange={(v) => fin("installments", Number(v))}
+                    />
+                  </div>
+                )}
+                <h3>Documentação</h3>
+                <label className="field">
+                  <span>Como calcular</span>
+                  <select
+                    value={draft.finance.docMode}
+                    onChange={(e) => fin("docMode", e.target.value)}
+                  >
+                    <option value="estimate">Estimativa · 6% do preço</option>
+                    <option value="detailed">Valores detalhados</option>
+                    <option value="total">Valor total informado</option>
+                  </select>
+                </label>
+                {draft.finance.docMode === "detailed" && (
+                  <div className="form-grid">
+                    {(
+                      [
+                        ["itbi", "ITBI (0 se isento)"],
+                        ["registry", "Registro (0 se isento)"],
+                        ["fees", "Taxas de cartório / banco"],
+                        ["other", "Outras despesas"],
+                      ] as const
+                    ).map(([k, l]) => (
+                      <Field
+                        key={k}
+                        label={l}
+                        type="number"
+                        value={draft.finance[k]}
+                        onChange={(v) => fin(k, number(v))}
+                      />
+                    ))}
+                  </div>
+                )}
+                {draft.finance.docMode === "total" && (
+                  <Field
+                    label="Total da documentação"
+                    type="number"
+                    value={draft.finance.docTotal}
+                    onChange={(v) => fin("docTotal", number(v))}
+                  />
+                )}
+                <Field
+                  label="Mês do pagamento da documentação"
+                  type="month"
+                  value={draft.finance.docMonth}
+                  onChange={(v) => fin("docMonth", v)}
+                />
+                <div className="inline-total">
+                  Preço + documentação
+                  <strong>
+                    {money(
+                      draft.price === null || documentation(draft) === null
+                        ? null
+                        : draft.price + documentation(draft)!,
+                    )}
+                  </strong>
+                </div>
+                <p className="small muted">
+                  Antes de juros, reforma e outras despesas. Não equivale ao
+                  desembolso inicial.
+                </p>
+                <details>
+                  <summary>Custos recorrentes e cronograma</summary>
+                  <div className="form-grid">
+                    <Field
+                      label="Condomínio mensal"
+                      type="number"
+                      value={draft.finance.condo}
+                      onChange={(v) => fin("condo", number(v))}
+                    />
+                    <Field
+                      label="IPTU anual (dividido por 12 no planejamento)"
+                      type="number"
+                      value={draft.finance.iptu}
+                      onChange={(v) => fin("iptu", number(v))}
+                    />
+                    <Field
+                      label="Início do condomínio"
+                      type="month"
+                      value={draft.finance.condoMonth}
+                      onChange={(v) => fin("condoMonth", v)}
+                    />
+                    <Field
+                      label="Início do IPTU (se diferente do condomínio)"
+                      type="month"
+                      value={draft.finance.iptuMonth}
+                      onChange={(v) => fin("iptuMonth", v)}
+                    />
+                  </div>
+                </details>
+                {draft.type !== null && draft.type !== "Pronto" && (
+                  <details>
+                    <summary>
+                      Evolução de obra · valor mensal fixo informado
+                    </summary>
+                    <p className="small muted">
+                      Informe os meses efetivos. Sobreposição com prestação só
+                      ocorrerá nas datas que você definir.
+                    </p>
+                    <div className="form-grid">
+                      <Field
+                        label="Valor mensal informado"
+                        type="number"
+                        value={draft.finance.construction}
+                        onChange={(v) => fin("construction", number(v))}
+                      />
+                      <Field
+                        label="Início da cobrança"
+                        type="month"
+                        value={draft.finance.constructionStart}
+                        onChange={(v) => fin("constructionStart", v)}
+                      />
+                      <Field
+                        label="Último mês da cobrança"
+                        type="month"
+                        value={draft.finance.constructionEnd}
+                        onChange={(v) => fin("constructionEnd", v)}
+                      />
+                    </div>
+                  </details>
+                )}
+                <details>
+                  <summary>Gastos eventuais: mudança, reforma e outros</summary>
+                  {draft.finance.extras.map((x, i) => (
+                    <div className="extra-row" key={x.id}>
+                      <Field
+                        label="Descrição"
+                        value={x.label}
+                        onChange={(v) =>
+                          fin(
+                            "extras",
+                            draft.finance.extras.map((a, j) =>
+                              j === i ? { ...a, label: v } : a,
+                            ),
+                          )
+                        }
+                      />
+                      <Field
+                        label="Valor"
+                        type="number"
+                        value={x.value}
+                        onChange={(v) =>
+                          fin(
+                            "extras",
+                            draft.finance.extras.map((a, j) =>
+                              j === i ? { ...a, value: Number(v) } : a,
+                            ),
+                          )
+                        }
+                      />
+                      <Field
+                        label="Mês"
+                        type="month"
+                        value={x.month}
+                        onChange={(v) =>
+                          fin(
+                            "extras",
+                            draft.finance.extras.map((a, j) =>
+                              j === i ? { ...a, month: v } : a,
+                            ),
+                          )
+                        }
+                      />
+                      <button
+                        className="icon-button"
+                        aria-label="Remover gasto"
+                        onClick={() =>
+                          fin(
+                            "extras",
+                            draft.finance.extras.filter((a) => a.id !== x.id),
+                          )
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    className="secondary"
+                    onClick={() =>
+                      fin("extras", [
+                        ...draft.finance.extras,
+                        {
+                          id: crypto.randomUUID(),
+                          label: "Gasto eventual",
+                          value: 0,
+                          month: start,
+                        },
+                      ])
+                    }
+                  >
+                    <Plus size={16} />
+                    Adicionar gasto
+                  </button>
+                </details>
+              </>
+            )}
+          </div>
+          <div className="dialog-footer">
+            {!isNew && (
+              <button
+                className="danger text-button"
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Excluir este imóvel? Exporte um backup se quiser preservá-lo.",
+                    )
+                  ) {
+                    persist(properties.filter((p) => p.id !== draft.id));
+                    setDraft(null);
+                    setSelected(selected.filter((id) => id !== draft.id));
+                  }
+                }}
+              >
+                <Trash2 size={16} />
+                Excluir
+              </button>
+            )}
+            <button className="primary" onClick={save}>
+              <Check size={16} />
+              {isNew ? "Salvar e avaliar depois" : "Salvar alterações"}
+            </button>
+          </div>
+        </Modal>
+      )}
+      {settings && (
+        <Modal
+          title="Nossas preferências"
+          description="O que importa para nós e o que cabe no nosso bolso."
+          onClose={() => setSettings(false)}
+        >
+          <div className="dialog-body">
+            <h3>O que estamos planejando</h3>
+            <div className="form-grid">
+              <Field
+                label="Renda familiar bruta mensal"
+                type="number"
+                value={tempPrefs.income}
+                onChange={(v) =>
+                  setTempPrefs({ ...tempPrefs, income: Number(v) })
+                }
+              />
+              <Field
+                label="Teto do preço do imóvel"
+                type="number"
+                value={tempPrefs.ceiling}
+                onChange={(v) =>
+                  setTempPrefs({ ...tempPrefs, ceiling: Number(v) })
+                }
+              />
+              <Field
+                label="Quartos mínimos"
+                type="number"
+                value={tempPrefs.minRooms}
+                onChange={(v) =>
+                  setTempPrefs({ ...tempPrefs, minRooms: number(v) })
+                }
+              />
+              <Field
+                label="Vagas mínimas"
+                type="number"
+                value={tempPrefs.minParking}
+                onChange={(v) =>
+                  setTempPrefs({ ...tempPrefs, minParking: number(v) })
+                }
+              />
+            </div>
+            <details>
+              <summary>
+                Pesos da avaliação · total{" "}
+                {tempPrefs.weights.reduce((a, b) => a + b, 0)}%
+              </summary>
+              <p className="small muted">
+                Distribua 100% conforme a importância de cada critério para
+                vocês.
+              </p>
+              {criteria.map((c, i) => (
+                <Field
+                  key={c}
+                  label={`${c} (%)`}
+                  type="number"
+                  value={tempPrefs.weights[i]}
+                  onChange={(v) =>
+                    setTempPrefs({
+                      ...tempPrefs,
+                      weights: tempPrefs.weights.map((w, j) =>
+                        i === j ? Number(v) : w,
+                      ),
+                    })
+                  }
+                />
+              ))}
+            </details>
+            <details>
+              <summary>Guardar ou recuperar uma cópia</summary>
+              <p className="small muted">
+                O backup contém seus dados pessoais. Guarde em um local privado.
+              </p>
+              <button className="secondary" onClick={exportData}>
+                <ArrowDownToLine size={16} />
+                Baixar cópia com anexos
+              </button>
+              <label className="file-input">
+                Recuperar uma cópia
+                <input
+                  type="file"
+                  accept="application/json"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 150 * 1024 * 1024) {
+                      setNotice(
+                        "A cópia precisa ter até 150 MB, incluindo os anexos.",
+                      );
+                      return;
+                    }
+                    try {
+                      const d = backupSchema.parse(
+                        JSON.parse(await file.text()),
+                      );
+                      if (
+                        confirm(
+                          "Substituir os imóveis e preferências por esta cópia?",
+                        )
+                      ) {
+                        await restoreFiles(d.properties, d.files);
+                        persist(d.properties, d.preferences);
+                        setTempPrefs(d.preferences);
+                        setNotice("Backup restaurado.");
+                      }
+                    } catch {
+                      setNotice("Backup inválido. Nenhum dado foi alterado.");
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </details>
+            <details>
+              <summary>Nossa conta e outros aparelhos</summary>
+              {supabase ? (
+                <>
+                  {user ? (
+                    <>
+                      <p>Conectado como {user}</p>
+                      <div className="button-row">
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => cloud("push")}
+                        >
+                          Guardar na nossa conta
+                        </button>
+                        <button
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => cloud("pull")}
+                        >
+                          Trazer da nossa conta
+                        </button>
+                        <button
+                          className="text-button"
+                          onClick={() => supabase?.auth.signOut()}
+                        >
+                          Sair
+                        </button>
+                      </div>
+                      <p className="small muted">
+                        Ao trocar de aparelho, traga a versão da nossa conta
+                        antes de editar. Depois, guarde suas mudanças para nós
+                        dois.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Field
+                        label="Seu e-mail"
+                        type="email"
+                        value={email}
+                        onChange={setEmail}
+                      />
+                      <button
+                        className="secondary"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            const result = await supabase!.auth.signInWithOtp({
+                              email,
+                              options: {
+                                shouldCreateUser: false,
+                                emailRedirectTo: window.location.origin,
+                              },
+                            });
+                            setNotice(
+                              result.error
+                                ? "Não foi possível enviar o link. Confira o e-mail e tente novamente."
+                                : "Link de acesso enviado. Confira seu e-mail.",
+                            );
+                          } catch {
+                            setNotice(
+                              "Sem conexão com a nuvem. Tente novamente.",
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Receber link de acesso
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="muted">
+                  Disponível após configurar o Supabase Free. O aplicativo já
+                  salva neste dispositivo e permite exportar backups.
+                </p>
+              )}
+            </details>
+          </div>
+          <div className="dialog-footer">
+            <button
+              className="primary"
+              onClick={() => {
+                const parsed = preferencesSchema.safeParse(tempPrefs);
+                if (!parsed.success) {
+                  setNotice(
+                    "Informe renda e teto positivos. Os pesos precisam somar 100%.",
+                  );
+                  return;
+                }
+                if (persist(properties, tempPrefs)) {
+                  setSettings(false);
+                  setNotice("Preferências salvas.");
+                }
+              }}
+            >
+              Salvar preferências
+            </button>
+          </div>
+        </Modal>
+      )}
+      {aiOpen && (
+        <Modal
+          title="Importar anúncio com IA"
+          description="Use apenas texto público de anúncio. Não inclua informações financeiras privadas."
+          onClose={() => setAiOpen(false)}
+        >
+          <div className="dialog-body">
+            <p className="hint">
+              Ao extrair, você autoriza o envio deste texto ao Gemini. No Free
+              Tier, o provedor pode usar os dados para melhorar seus produtos.
+              Revise todos os campos antes de salvar. Leitura direta de links e
+              arquivos indisponível nesta versão; cole o texto do anúncio.
+            </p>
+            <label className="field">
+              <span>Texto do anúncio (até 12.000 caracteres)</span>
+              <textarea
+                maxLength={12000}
+                value={aiText}
+                onChange={(e) => setAiText(e.target.value)}
+              />
+            </label>
+            <button
+              className="secondary"
+              disabled={busy || !aiText.trim()}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const session = await supabase?.auth.getSession();
+                  const response = await fetch("/api/import", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${session?.data.session?.access_token ?? ""}`,
+                    },
+                    body: JSON.stringify({ text: aiText, consent: true }),
+                  });
+                  const result = await response.json();
+                  if (!response.ok) throw Error(result.error);
+                  setAiPreview(result.fields);
+                } catch (e) {
+                  setNotice(
+                    e instanceof Error
+                      ? e.message
+                      : "Falha na extração. Continue manualmente.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Autorizar e extrair texto
+            </button>
+            {aiPreview && (
+              <>
+                <h3>Prévia editável</h3>
+                {Object.entries(aiPreview).map(([k, f]) => (
+                  <div key={k}>
+                    <Field
+                      label={k}
+                      value={f.valor}
+                      onChange={(v) =>
+                        setAiPreview({ ...aiPreview, [k]: { ...f, valor: v } })
+                      }
+                    />
+                    <small className="muted">
+                      {f.origem} · {f.confianca}
+                    </small>
+                  </div>
+                ))}
+                <button
+                  className="primary"
+                  onClick={() => {
+                    const p = newProperty();
+                    p.name = String(
+                      aiPreview.name?.valor ?? "Imóvel importado",
+                    );
+                    p.location = String(aiPreview.location?.valor ?? "");
+                    for (const k of [
+                      "price",
+                      "area",
+                      "rooms",
+                      "baths",
+                      "parking",
+                    ] as const) {
+                      const v = aiPreview[k]?.valor;
+                      p[k] =
+                        v === null || v === "" || v === undefined
+                          ? null
+                          : Number(v);
+                    }
+                    setAiOpen(false);
+                    open(p, true);
+                  }}
+                >
+                  Revisar no cadastro
+                </button>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
