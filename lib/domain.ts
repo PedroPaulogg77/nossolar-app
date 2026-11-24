@@ -13,6 +13,8 @@ export const financeSchema = z.object({
   financed: amount,
   fgts: amount,
   subsidy: amount,
+  cashEntry: amount.default(null),
+  installmentTotal: amount.default(null),
   deposit: amount,
   installments: z.number().int().min(1).max(600),
   split: z.boolean(),
@@ -76,6 +78,7 @@ export type Property = z.infer<typeof propertySchema>;
 export type Finance = Property["finance"];
 export const preferencesSchema = z.object({
   income: z.number().positive(),
+  savings: amount.default(null),
   ceiling: z.number().positive(),
   minRooms: amount,
   minParking: amount,
@@ -96,6 +99,7 @@ export const backupSchema = z.object({
 });
 export const defaults: Preferences = {
   income: 8000,
+  savings: null,
   ceiling: 400000,
   minRooms: null,
   minParking: null,
@@ -133,6 +137,8 @@ export function newProperty(): Property {
       financed: null,
       fgts: null,
       subsidy: null,
+      cashEntry: null,
+      installmentTotal: null,
       deposit: null,
       installments: 12,
       split: false,
@@ -199,9 +205,35 @@ export function documentation(p: Property): number | null {
 }
 export function entry(p: Property): number | null {
   const f = p.finance;
+  if (f.cashEntry !== null) return f.cashEntry;
   if ([p.price, f.financed, f.fgts, f.subsidy].some((v) => v === null))
     return null;
   return Math.max(0, p.price! - f.financed! - f.fgts! - f.subsidy!);
+}
+export function entryParts(p: Property) {
+  const total = entry(p),
+    f = p.finance;
+  if (total === null) return { upfront: null, installments: null };
+  if (!f.split) return { upfront: total, installments: 0 };
+  const installments =
+    f.installmentTotal ?? (f.deposit === null ? null : total - f.deposit);
+  return {
+    upfront: installments === null ? null : total - installments,
+    installments,
+  };
+}
+export function acquisitionGap(p: Property, savings: number | null) {
+  const parts = entryParts(p),
+    doc = documentation(p);
+  return savings === null || parts.upfront === null || doc === null
+    ? null
+    : Math.max(
+        0,
+        parts.upfront +
+          doc +
+          p.finance.extras.reduce((n, x) => n + x.value, 0) -
+          savings,
+      );
 }
 export function recurring(p: Property) {
   return sumKnown([
@@ -258,6 +290,10 @@ export function validateFinance(p: Property) {
     return "Financiamento, FGTS e subsídio excedem o preço.";
   if (e !== null && f.deposit !== null && f.deposit > e)
     return "O sinal não pode exceder a entrada em dinheiro.";
+  if (e !== null && f.installmentTotal !== null && f.installmentTotal > e)
+    return "A parte parcelada não pode exceder a entrada em dinheiro.";
+  if (f.cashEntry !== null && p.price !== null && f.cashEntry > p.price)
+    return "A entrada informada não pode exceder o preço do imóvel.";
   if (
     f.constructionStart &&
     f.constructionEnd &&
@@ -293,7 +329,9 @@ export function cashflow(p: Property, start: string) {
     ["Documentação", doc, f.docMonth],
   ] as const)
     if (value === null || (value > 0 && !date)) pending.push(label);
-  if (f.split && f.deposit === null) pending.push("Sinal");
+  const parts = entryParts(p);
+  if (f.split && parts.installments === null)
+    pending.push("Parte parcelada da entrada");
   if (f.extras.some((x) => !x.month)) pending.push("Mês dos gastos eventuais");
   if (
     p.type !== "Pronto" &&
@@ -310,16 +348,16 @@ export function cashflow(p: Property, start: string) {
       const values = Array<number>(8).fill(0);
       if (f.entryMonth && e !== null) {
         const offset = index - monthIndex(f.entryMonth);
-        if (offset === 0) values[0] = f.split ? (f.deposit ?? 0) : e;
+        if (offset === 0) values[0] = parts.upfront ?? 0;
         const installmentOffset =
           index - monthIndex(f.installmentMonth || f.entryMonth);
         if (
           f.split &&
-          f.deposit !== null &&
+          parts.installments !== null &&
           installmentOffset >= 0 &&
           installmentOffset < f.installments
         ) {
-          const cents = Math.round((e - f.deposit) * 100),
+          const cents = Math.round(parts.installments * 100),
             base = Math.floor(cents / f.installments);
           values[1] =
             (base + (installmentOffset < cents % f.installments ? 1 : 0)) / 100;

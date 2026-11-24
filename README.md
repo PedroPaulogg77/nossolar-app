@@ -28,7 +28,7 @@ Os imóveis criados pelos testes são dados de teste isolados, nunca conteúdo i
 - **Imóveis:** cadastro, edição, favoritos, status e checklist. Cidade e bairro separados geram filtros automaticamente; bairros são filtrados pela cidade. Valores antigos são preservados sem inferir a separação.
 - **Anexos por imóvel:** fotos, planos de pagamento e documentos. PDF, JPG, PNG, WebP, DOCX e XLSX; até 10 MB/arquivo, 20 arquivos/imóvel e 100 MB referenciados no espaço. Prévia de imagens/PDF e download; primeira foto anexada pode ser a capa. Anexos não são enviados para IA. A cópia JSON inclui os bytes dos arquivos e pode ser restaurada em outro navegador.
 - **Comparar:** duas ou três opções; métricas sem preencher desconhecidos com zero; nota consensual ponderada e requisitos configuráveis.
-- **Finanças:** entrada, FGTS e subsídio explícitos, sinal e parcelas, documentação substitutiva, prestação real informada, condomínio, IPTU anual dividido por 12, obra fixa com vigência, eventuais e gráfico interativo de 12 meses.
+- **Finanças:** entrada em dinheiro informada diretamente, parte à vista e parte parcelada, reserva atual editável e diferença para entrada/documentação/gastos eventuais; prestação real informada, condomínio, IPTU anual dividido por 12, obra fixa com vigência e fluxo interativo de 12 meses. Valores antigos de FGTS e subsídio continuam preservados nos dados, sem campos na interface.
 - **Preferências:** renda, teto, requisitos, pesos, exportação/importação JSON e cópia manual na nuvem.
 
 Veja `docs/DESIGN.md` para arquitetura, wireframes textuais e tokens.

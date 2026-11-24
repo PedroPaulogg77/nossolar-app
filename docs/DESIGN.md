@@ -12,3 +12,6 @@ Inter hospedada localmente; títulos 28–40px, corpo 14–16px, métricas 28px.
 
 ## Integridade
 Somente o exemplo real do briefing. Dados desconhecidos são null. Zero exige entrada explícita. Nota final apenas com todos os critérios de peso positivo preenchidos; progresso por peso, sem renormalização. Indicadores objetivos não viram notas automaticamente. Salvamento explícito com feedback e backup validado.
+
+## Ajustes de usabilidade
+A ficha ocupa quase toda a área útil em desktop e permanece um painel de tela inteira no celular. A home abre direto na lista, sem faixa de apresentação. A entrada em dinheiro pode ser informada; ao parcelar, o usuário indica apenas a parte parcelada. A reserva atual é editável em Finanças e comparada ao valor à vista, documentação e gastos eventuais. Meses usam seletores separados de mês e ano; as categorias do fluxo têm cores distintas e legenda visível.

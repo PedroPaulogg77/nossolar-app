@@ -15,6 +15,7 @@
   --cash-6: #bca881;
   --cash-7: #d3ddd7;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -2032,5 +2033,149 @@ input[type="checkbox"] {
   }
   .dialog-body {
     padding-bottom: 35px;
+  }
+}
+@media (min-width: 900px) {
+  .dialog {
+    width: min(1160px, calc(100vw - 96px));
+    height: min(900px, calc(100vh - 80px));
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px #10251b24;
+  }
+  .dialog-head,
+  .dialog-footer {
+    padding-left: 44px;
+    padding-right: 44px;
+  }
+  .dialog-body {
+    padding: 28px 44px;
+  }
+  .dialog .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.compact-fields {
+  grid-column: 1/-1;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.compact-fields .field {
+  font-size: 12px;
+}
+.compact-fields input,
+.compact-fields select {
+  min-width: 0;
+}
+.month-pickers {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(92px, 1fr);
+  gap: 8px;
+}
+.month-pickers select {
+  min-height: 44px;
+  border: 1px solid #dbe3de;
+  border-radius: 6px;
+  background: white;
+  padding: 10px;
+  color: var(--ink);
+  width: 100%;
+}
+.savings-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(170px, 0.8fr) minmax(
+      180px,
+      0.8fr
+    );
+  gap: 22px;
+  align-items: center;
+  padding: 24px;
+  background: #edf3ef;
+  border: 1px solid #d9e6de;
+  border-radius: 11px;
+  margin-bottom: 24px;
+}
+.savings-panel h2 {
+  font-size: 18px;
+  margin: 8px 0;
+}
+.savings-panel p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+.savings-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.savings-result span,
+.savings-result small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.savings-result strong {
+  font-size: 22px;
+  font-weight: 500;
+}
+.chart {
+  gap: 14px;
+}
+.bar i {
+  border-top: 1px solid #ffffff9e;
+}
+.legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px #0002;
+}
+:root {
+  --cash-0: #175e55;
+  --cash-1: #4b8d88;
+  --cash-2: #b47735;
+  --cash-3: #305d91;
+  --cash-4: #6988b0;
+  --cash-5: #9bacc4;
+  --cash-6: #aa6260;
+  --cash-7: #806b9c;
+}
+@media (max-width: 760px) {
+  .compact-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .savings-panel {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px;
+  }
+  .savings-panel .field {
+    margin-bottom: 0;
+  }
+  .month-pickers select {
+    font-size: 15px;
+  }
+  .chart {
+    gap: 4px;
+  }
+}
+.chart-heading .field {
+  max-width: 260px;
+  min-width: 240px;
+}
+.chart-heading .month-pickers {
+  grid-template-columns: minmax(125px, 1.5fr) minmax(85px, 1fr);
+}
+@media (max-width: 760px) {
+  .chart-heading .field {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .chart-heading .month-pickers {
+    grid-template-columns: minmax(0, 1.5fr) minmax(80px, 1fr);
   }
 }

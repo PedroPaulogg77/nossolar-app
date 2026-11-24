@@ -123,3 +123,43 @@ test("preferências, formulário inválido, favoritos e IA desligada", async ({
   });
   expect(response.status()).toBe(503);
 });
+test("entrada parcial, reserva e ficha ampla", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  const dialog = page.getByRole("dialog");
+  const width = await dialog.evaluate((el) => el.getBoundingClientRect().width);
+  expect(width).toBeGreaterThan(900);
+  await expect(page.getByLabel("Suítes")).toBeVisible();
+  await expect(page.getByLabel("Varanda")).toBeVisible();
+  await page.getByRole("button", { name: "Custos", exact: true }).click();
+  await page.getByLabel("Entrada em dinheiro (R$)").fill("90000");
+  await page.getByLabel("Entrada parcelada").check();
+  await page.getByLabel("Parte da entrada a parcelar").fill("30000");
+  await page.getByLabel("Número de parcelas dessa parte").fill("3");
+  await page.getByLabel("Mês da entrada / sinal: mês").selectOption("01");
+  await page.getByLabel("Mês da entrada / sinal: ano").selectOption("2027");
+  await page
+    .getByLabel("Início das parcelas (se diferente do sinal): mês")
+    .selectOption("02");
+  await page
+    .getByLabel("Início das parcelas (se diferente do sinal): ano")
+    .selectOption("2027");
+  await expect(page.getByText("R$ 60.000,00", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: "test-results/desktop-edit-wide.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await page.getByRole("button", { name: "Finanças", exact: true }).click();
+  await page.getByLabel("Valor disponível hoje (R$)").fill("50000");
+  await expect(page.getByText("R$ 16.000,00", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Finanças", exact: true }).click();
+  await expect(page.getByLabel("Valor disponível hoje (R$)")).toHaveValue(
+    "50000",
+  );
+  await page.screenshot({
+    path: "test-results/desktop-finance-reserve.png",
+    fullPage: true,
+  });
+});

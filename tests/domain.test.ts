@@ -4,6 +4,8 @@ import {
   initialProperty,
   documentation,
   entry,
+  entryParts,
+  acquisitionGap,
   cashflow,
   defaults,
   score,
@@ -13,6 +15,27 @@ import {
   recurring,
 } from "../lib/domain";
 describe("Integridade financeira", () => {
+  it("aceita entrada informada e parcela só a parte escolhida", () => {
+    const p = initialProperty();
+    p.finance.cashEntry = 90000;
+    p.finance.split = true;
+    p.finance.installmentTotal = 30000;
+    p.finance.installments = 3;
+    p.finance.entryMonth = "2027-01";
+    p.finance.installmentMonth = "2027-02";
+    expect(entry(p)).toBe(90000);
+    expect(entryParts(p)).toEqual({ upfront: 60000, installments: 30000 });
+    expect(acquisitionGap(p, 50000)).toBe(16000);
+    const months = cashflow(p, "2027-01").months;
+    expect(months[0].values[0]).toBe(60000);
+    expect(months[0].values[1]).toBe(0);
+    expect(months[1].values[1]).toBe(10000);
+    expect(
+      months.reduce((total, m) => total + m.values[0] + m.values[1], 0),
+    ).toBe(90000);
+    p.finance.installmentTotal = 100000;
+    expect(validateFinance(p)).toContain("parte parcelada");
+  });
   it("separa meses do sinal, parcelas, condomínio e IPTU", () => {
     const p = initialProperty();
     Object.assign(p.finance, {

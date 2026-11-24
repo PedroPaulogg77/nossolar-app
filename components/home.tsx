@@ -34,6 +34,8 @@ import {
   money,
   documentation,
   entry,
+  entryParts,
+  acquisitionGap,
   recurring,
   score,
   requirements,
@@ -70,6 +72,52 @@ function Field({
   max?: number;
   step?: string;
 }) {
+  if (type === "month") {
+    const current = String(value ?? "");
+    const [year, month] = current.split("-");
+    const years = Array.from({ length: 31 }, (_, i) => 2024 + i);
+    return (
+      <div className="field">
+        <span>{label}</span>
+        <div className="month-pickers">
+          <select
+            aria-label={`${label}: mês`}
+            value={month ?? ""}
+            onChange={(e) =>
+              onChange(
+                e.target.value
+                  ? `${year || new Date().getFullYear()}-${e.target.value}`
+                  : "",
+              )
+            }
+          >
+            <option value="">Mês</option>
+            {Array.from({ length: 12 }, (_, i) => (
+              <option key={i} value={String(i + 1).padStart(2, "0")}>
+                {new Date(2024, i, 1).toLocaleDateString("pt-BR", {
+                  month: "long",
+                })}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label={`${label}: ano`}
+            value={year ?? ""}
+            onChange={(e) =>
+              onChange(
+                e.target.value ? `${e.target.value}-${month || "01"}` : "",
+              )
+            }
+          >
+            <option value="">Ano</option>
+            {years.map((y) => (
+              <option key={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  }
   return (
     <label className="field">
       <span>{label}</span>
@@ -506,20 +554,6 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
             <>
               {tab === "Imóveis" && (
                 <>
-                  <div className="private-note">
-                    <span className="note-mark">
-                      <House size={22} />
-                    </span>
-                    <div>
-                      <strong>Nosso próximo endereço</strong>
-                      <p>
-                        {properties.length === 1
-                          ? "Por enquanto, temos 1 imóvel na nossa lista."
-                          : `Temos ${properties.length} imóveis na nossa lista.`}{" "}
-                        Sem pressa, vamos escolhendo juntos.
-                      </p>
-                    </div>
-                  </div>
                   <div className="collection-title">
                     <h2>
                       Nossa lista{" "}
@@ -893,16 +927,48 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                         Ajustar custos
                       </button>
                     </div>
+                    <section className="savings-panel">
+                      <div>
+                        <span className="eyebrow">NOSSA RESERVA</span>
+                        <h2>Quanto temos guardado hoje?</h2>
+                        <p>
+                          Atualize quando esse valor mudar. A reserva é
+                          comparada com a entrada à vista, a documentação e os
+                          gastos eventuais registrados.
+                        </p>
+                      </div>
+                      <Field
+                        label="Valor disponível hoje (R$)"
+                        type="number"
+                        value={prefs.savings}
+                        onChange={(v) => {
+                          const updated = { ...prefs, savings: number(v) };
+                          persist(properties, updated);
+                        }}
+                      />
+                      <div className="savings-result">
+                        <span>Falta para esses gastos</span>
+                        <strong>
+                          {money(acquisitionGap(current, prefs.savings))}
+                        </strong>
+                        <small>
+                          {acquisitionGap(current, prefs.savings) === null
+                            ? "Complete a reserva, a entrada e a documentação para calcular."
+                            : "Inclui os gastos eventuais registrados; veja o mês de cada pagamento abaixo."}
+                        </small>
+                      </div>
+                    </section>
                     <div className="metrics">
                       <Metric
-                        label="Para adquirir / entrar"
+                        label="Entrada à vista + documentação"
                         value={money(
-                          entry(current) === null ||
+                          entryParts(current).upfront === null ||
                             documentation(current) === null
                             ? null
-                            : entry(current)! + documentation(current)!,
+                            : entryParts(current).upfront! +
+                                documentation(current)!,
                         )}
-                        help="Entrada em dinheiro + documentação"
+                        help="A parte parcelada aparece nos meses seguintes"
                       />
                       <Metric
                         label="Prestação informada"
@@ -1159,6 +1225,7 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                     {[
                       ["rooms", "Quartos"],
                       ["baths", "Banheiros"],
+                      ["suites", "Suítes"],
                       ["parking", "Vagas"],
                     ].map(([key, label]) => (
                       <Field
@@ -1171,6 +1238,26 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                         }
                       />
                     ))}
+                    <label className="field">
+                      <span>Varanda</span>
+                      <select
+                        value={
+                          draft.balcony === null ? "" : String(draft.balcony)
+                        }
+                        onChange={(e) =>
+                          update(
+                            "balcony",
+                            e.target.value === ""
+                              ? null
+                              : e.target.value === "true",
+                          )
+                        }
+                      >
+                        <option value="">A confirmar</option>
+                        <option value="true">Sim</option>
+                        <option value="false">Não</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
                 <details>
@@ -1192,12 +1279,6 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                       label="Endereço"
                       value={draft.address}
                       onChange={(v) => update("address", v)}
-                    />
-                    <Field
-                      label="Suítes"
-                      type="number"
-                      value={draft.suites}
-                      onChange={(v) => update("suites", number(v))}
                     />
                     <Field
                       label="Andar"
@@ -1233,9 +1314,9 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                         ))}
                       </select>
                     </label>
-                    {(["balcony", "elevator"] as const).map((k, i) => (
+                    {(["elevator"] as const).map((k, i) => (
                       <label className="field" key={k}>
-                        <span>{i ? "Elevador" : "Varanda"}</span>
+                        <span>Elevador</span>
                         <select
                           value={draft[k] === null ? "" : String(draft[k])}
                           onChange={(e) =>
@@ -1277,28 +1358,6 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                         onChange={(e) => update("notes", e.target.value)}
                       />
                     </label>
-                    {[
-                      "Conferir documentação",
-                      "Visitar o imóvel",
-                      "Verificar ruídos e iluminação",
-                      "Conferir estado das instalações",
-                    ].map((c) => (
-                      <label className="check-label" key={c}>
-                        <input
-                          type="checkbox"
-                          checked={draft.checklist.includes(c)}
-                          onChange={(e) =>
-                            update(
-                              "checklist",
-                              e.target.checked
-                                ? [...draft.checklist, c]
-                                : draft.checklist.filter((x) => x !== c),
-                            )
-                          }
-                        />
-                        {c}
-                      </label>
-                    ))}
                   </details>
                 )}
                 <PropertyAttachments
@@ -1381,11 +1440,15 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                 </div>
                 <h3>Entrada e financiamento</h3>
                 <div className="form-grid">
+                  <Field
+                    label="Entrada em dinheiro (R$)"
+                    type="number"
+                    value={draft.finance.cashEntry}
+                    onChange={(v) => fin("cashEntry", number(v))}
+                  />
                   {(
                     [
                       ["financed", "Financiamento informado"],
-                      ["fgts", "FGTS aplicado"],
-                      ["subsidy", "Subsídio confirmado"],
                       ["payment", "Prestação da simulação"],
                     ] as const
                   ).map(([key, label]) => (
@@ -1410,9 +1473,11 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                     onChange={(v) => fin("paymentMonth", v)}
                   />
                 </div>
-                <div className="inline-total">
-                  Entrada em dinheiro<strong>{money(entry(draft))}</strong>
-                </div>
+                <p className="hint">
+                  Informe a entrada conforme a proposta. Se deixar em branco,
+                  ela só será calculada quando todos os dados necessários
+                  estiverem disponíveis.
+                </p>
                 <label className="check-label">
                   <input
                     type="checkbox"
@@ -1424,11 +1489,15 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                 {draft.finance.split && (
                   <div className="form-grid">
                     <Field
-                      label="Sinal (pago no mês inicial)"
+                      label="Parte da entrada a parcelar"
                       type="number"
-                      value={draft.finance.deposit}
-                      onChange={(v) => fin("deposit", number(v))}
+                      value={draft.finance.installmentTotal}
+                      onChange={(v) => fin("installmentTotal", number(v))}
                     />
+                    <div className="inline-total">
+                      Parte à vista
+                      <strong>{money(entryParts(draft).upfront)}</strong>
+                    </div>
                     <Field
                       label="Início das parcelas (se diferente do sinal)"
                       type="month"
@@ -1436,7 +1505,7 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                       onChange={(v) => fin("installmentMonth", v)}
                     />
                     <Field
-                      label="Quantidade de parcelas do saldo"
+                      label="Número de parcelas dessa parte"
                       type="number"
                       value={draft.finance.installments}
                       onChange={(v) => fin("installments", Number(v))}
