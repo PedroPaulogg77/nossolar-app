@@ -595,6 +595,42 @@ main {
   font-size: 9px;
   color: #5f6d62;
 }
+.photo-badge.stage-ready {
+  background: #e8f3ed;
+  color: #245a43;
+}
+.photo-badge.stage-building {
+  background: #f7ede0;
+  color: #815720;
+}
+.photo-badge.stage-planned {
+  background: #edeaf6;
+  color: #5d527c;
+}
+.photo-badge.stage-unknown {
+  background: #fffffff0;
+  color: #5f6d62;
+}
+.stage-filter {
+  margin: 6px 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.stage-filter > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.stage-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stage-options .chip {
+  min-height: 36px;
+}
 .favorite {
   position: absolute;
   right: 12px;

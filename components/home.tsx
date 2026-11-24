@@ -14,7 +14,6 @@ import {
   Plus,
   Search,
   Settings2,
-  SlidersHorizontal,
   Wallet,
   Columns3,
   X,
@@ -245,11 +244,11 @@ export default function Home({
     [ready, setReady] = useState(false),
     [tab, setTab] = useState("Imóveis"),
     [filter, setFilter] = useState("Todos"),
+    [stageFilter, setStageFilter] = useState("Todos"),
     [search, setSearch] = useState(""),
     [sort, setSort] = useState("Favoritos"),
     [cityFilter, setCityFilter] = useState(""),
     [neighborhoodFilter, setNeighborhoodFilter] = useState(""),
-    [more, setMore] = useState(false),
     [draft, setDraft] = useState<Property | null>(null),
     [section, setSection] = useState("Visão geral"),
     [isNew, setIsNew] = useState(false),
@@ -429,10 +428,12 @@ export default function Home({
           .toLowerCase()
           .includes(search.toLowerCase()) &&
         matchesLocation(p, cityFilter, neighborhoodFilter) &&
+        (stageFilter === "Todos" ||
+          (stageFilter === "A confirmar"
+            ? p.type === null
+            : p.type === stageFilter)) &&
         (filter === "Todos" ||
           (filter === "Favoritos" && p.favorite) ||
-          (filter === "Prontos" && p.type === "Pronto") ||
-          (filter === "Na planta" && p.type === "Na planta") ||
           (filter === "Visitados" && p.status === "Visitado") ||
           (filter === "Em avaliação" && p.status === "Em avaliação")),
     )
@@ -645,9 +646,7 @@ export default function Home({
                           "Todos",
                           "Favoritos",
                           "Em avaliação",
-                          ...(more
-                            ? ["Visitados", "Prontos", "Na planta"]
-                            : []),
+                          "Visitados",
                         ].map((f) => (
                           <button
                             className={filter === f ? "chip selected" : "chip"}
@@ -657,13 +656,6 @@ export default function Home({
                             {f === "Favoritos" && <Heart size={13} />} {f}
                           </button>
                         ))}
-                        <button
-                          className="icon-button"
-                          aria-label="Mais filtros"
-                          onClick={() => setMore(!more)}
-                        >
-                          <SlidersHorizontal size={16} />
-                        </button>
                       </div>
                       <div className="search-sort">
                         <label className="search">
@@ -693,6 +685,35 @@ export default function Home({
                       </div>
                     </div>
                   )}
+                  {properties.length > 0 && (
+                    <div className="stage-filter">
+                      <span>Fase do imóvel</span>
+                      <div
+                        className="stage-options"
+                        role="group"
+                        aria-label="Filtrar por fase do imóvel"
+                      >
+                        {[
+                          "Todos",
+                          "Pronto",
+                          "Em obra",
+                          "Na planta",
+                          "A confirmar",
+                        ].map((stage) => (
+                          <button
+                            key={stage}
+                            className={
+                              stageFilter === stage ? "chip selected" : "chip"
+                            }
+                            aria-pressed={stageFilter === stage}
+                            onClick={() => setStageFilter(stage)}
+                          >
+                            {stage}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {properties.length > 0 && locationFilters}
                   <div className="property-grid">
                     {visible.map((p) => (
@@ -709,7 +730,9 @@ export default function Home({
                               fallback={<Placeholder />}
                             />
                           )}
-                          <span className="badge photo-badge">
+                          <span
+                            className={`badge photo-badge stage-${p.type === "Pronto" ? "ready" : p.type === "Em obra" ? "building" : p.type === "Na planta" ? "planned" : "unknown"}`}
+                          >
                             {p.type ?? "Tipo a confirmar"}
                           </span>
                           <button
@@ -808,10 +831,10 @@ export default function Home({
                           className="secondary"
                           onClick={() => {
                             setFilter("Todos");
+                            setStageFilter("Todos");
                             setSearch("");
                             setCityFilter("");
                             setNeighborhoodFilter("");
-                            setMore(false);
                           }}
                         >
                           Limpar busca e filtros
@@ -1271,7 +1294,7 @@ export default function Home({
                     onChange={(v) => update("name", v)}
                   />
                   <label className="field">
-                    <span>Tipo de imóvel</span>
+                    <span>Fase do imóvel</span>
                     <select
                       value={draft.type ?? ""}
                       onChange={(e) => update("type", e.target.value || null)}
