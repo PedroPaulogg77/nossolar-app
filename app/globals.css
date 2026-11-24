@@ -1053,6 +1053,24 @@ main {
 .dialog-body h3 {
   margin-top: 24px;
 }
+.ai-preview-section {
+  padding: 22px 0 10px;
+  border-top: 1px solid var(--line);
+}
+.ai-preview-section:first-of-type {
+  margin-top: 20px;
+}
+.ai-preview-section h4 {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ai-preview-section small {
+  display: block;
+  margin: -4px 0 15px;
+  line-height: 1.5;
+}
 .dialog-footer {
   display: flex;
   justify-content: flex-end;

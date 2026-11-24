@@ -56,7 +56,66 @@ import {
   matchesLocation,
 } from "@/lib/locations";
 import { packFiles, restoreFiles, syncFiles } from "@/lib/attachments";
+import { propertyFromAi, type AiPreview } from "@/lib/ai-import";
 const STORAGE = "nosso-lar-v1";
+const aiGroups = [
+  {
+    title: "O imóvel",
+    fields: [
+      ["name", "Nome do imóvel"],
+      ["type", "Estágio da obra"],
+      ["price", "Preço anunciado (R$)"],
+      ["area", "Área privativa (m²)"],
+    ],
+  },
+  {
+    title: "Onde fica",
+    fields: [
+      ["city", "Cidade"],
+      ["neighborhood", "Bairro"],
+      ["address", "Endereço"],
+    ],
+  },
+  {
+    title: "Planta e detalhes",
+    fields: [
+      ["rooms", "Quartos"],
+      ["baths", "Banheiros"],
+      ["suites", "Suítes"],
+      ["parking", "Vagas"],
+      ["balcony", "Varanda"],
+      ["elevator", "Elevador"],
+      ["floor", "Andar"],
+      ["sun", "Posição solar"],
+    ],
+  },
+  {
+    title: "Prazos e custos",
+    fields: [
+      ["delivery", "Previsão de entrega"],
+      ["condo", "Condomínio (R$/mês)"],
+      ["iptu", "IPTU (R$/mês)"],
+      ["cashEntry", "Entrada à vista (R$)"],
+      ["installmentTotal", "Parte parcelada da entrada (R$)"],
+      ["installments", "Parcelas da entrada"],
+      ["payment", "Prestação anunciada (R$/mês)"],
+    ],
+  },
+] as const;
+const aiNumericKeys = new Set([
+  "price",
+  "area",
+  "rooms",
+  "baths",
+  "suites",
+  "parking",
+  "condo",
+  "iptu",
+  "cashEntry",
+  "installmentTotal",
+  "installments",
+  "payment",
+]);
 function Field({
   label,
   value,
@@ -194,10 +253,7 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
     [busy, setBusy] = useState(false),
     [aiOpen, setAiOpen] = useState(false),
     [aiText, setAiText] = useState(""),
-    [aiPreview, setAiPreview] = useState<Record<
-      string,
-      { valor: string | number | null; origem: string; confianca: string }
-    > | null>(null);
+    [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE);
@@ -1961,92 +2017,123 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
           onClose={() => setAiOpen(false)}
         >
           <div className="dialog-body">
-            <p className="hint">
-              Pode copiar a página inteira do anúncio. A IA tentará ignorar menus,
-              anúncios e textos de outros imóveis. Ao extrair, você autoriza o envio deste texto ao Gemini. No Free
-              Tier, o provedor pode usar os dados para melhorar seus produtos.
-              Revise todos os campos antes de salvar. Leitura direta de links e
-              arquivos indisponível nesta versão; cole o texto do anúncio.
-            </p>
-            <label className="field">
-              <span>Texto da página do anúncio (até 50.000 caracteres)</span>
-              <textarea
-                maxLength={50000}
-                value={aiText}
-                onChange={(e) => setAiText(e.target.value)}
-              />
-            </label>
-            <button
-              className="secondary"
-              disabled={busy || !aiText.trim()}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const session = await supabase?.auth.getSession();
-                  const response = await fetch("/api/import", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${session?.data.session?.access_token ?? ""}`,
-                    },
-                    body: JSON.stringify({ text: aiText, consent: true }),
-                  });
-                  const result = await response.json();
-                  if (!response.ok) throw Error(result.error);
-                  setAiPreview(result.fields);
-                } catch (e) {
-                  setNotice(
-                    e instanceof Error
-                      ? e.message
-                      : "Falha na extração. Continue manualmente.",
-                  );
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Autorizar e extrair texto
-            </button>
+            {!aiPreview && (
+              <>
+                <p className="hint">
+                  Pode copiar a página inteira do anúncio. A IA tentará ignorar
+                  menus, anúncios e textos de outros imóveis. Ao extrair, você
+                  autoriza o envio deste texto ao Gemini. No Free Tier, o
+                  provedor pode usar os dados para melhorar seus produtos.
+                  Revise todos os campos antes de salvar. Leitura direta de
+                  links e arquivos indisponível nesta versão; cole o texto do
+                  anúncio.
+                </p>
+                <label className="field">
+                  <span>
+                    Texto da página do anúncio (até 50.000 caracteres)
+                  </span>
+                  <textarea
+                    maxLength={50000}
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value)}
+                  />
+                </label>
+                <button
+                  className="secondary"
+                  disabled={busy || !aiText.trim()}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const session = await supabase?.auth.getSession();
+                      const response = await fetch("/api/import", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${session?.data.session?.access_token ?? ""}`,
+                        },
+                        body: JSON.stringify({ text: aiText, consent: true }),
+                      });
+                      const result = await response.json();
+                      if (!response.ok) throw Error(result.error);
+                      setAiPreview(result.fields);
+                    } catch (e) {
+                      setNotice(
+                        e instanceof Error
+                          ? e.message
+                          : "Falha na extração. Continue manualmente.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Autorizar e extrair texto
+                </button>
+              </>
+            )}
             {aiPreview && (
               <>
-                <h3>Prévia editável</h3>
-                {Object.entries(aiPreview).map(([k, f]) => (
-                  <div key={k}>
-                    <Field
-                      label={k}
-                      value={f.valor}
-                      onChange={(v) =>
-                        setAiPreview({ ...aiPreview, [k]: { ...f, valor: v } })
-                      }
-                    />
-                    <small className="muted">
-                      {f.origem} · {f.confianca}
-                    </small>
-                  </div>
-                ))}
+                <h3>O que encontramos no anúncio</h3>
+                <p className="muted">
+                  Confira os dados antes de abrir o cadastro. O que não apareceu
+                  no anúncio poderá ser preenchido depois.
+                </p>
+                <button
+                  className="text-button"
+                  onClick={() => setAiPreview(null)}
+                >
+                  Colar outro anúncio
+                </button>
+                {aiGroups.map((group) => {
+                  const found = group.fields.filter(([key]) => {
+                    const value = aiPreview[key]?.valor;
+                    return (
+                      value !== null && value !== undefined && value !== ""
+                    );
+                  });
+                  if (!found.length) return null;
+                  return (
+                    <section key={group.title} className="ai-preview-section">
+                      <h4>{group.title}</h4>
+                      <div className="form-grid">
+                        {found.map(([key, label]) => {
+                          const field = aiPreview[key];
+                          return (
+                            <div key={key}>
+                              <Field
+                                label={label}
+                                type={
+                                  aiNumericKeys.has(key) ? "number" : "text"
+                                }
+                                value={
+                                  typeof field.valor === "boolean"
+                                    ? field.valor
+                                      ? "Sim"
+                                      : "Não"
+                                    : String(field.valor ?? "")
+                                }
+                                onChange={(value) =>
+                                  setAiPreview({
+                                    ...aiPreview,
+                                    [key]: { ...field, valor: value },
+                                  })
+                                }
+                              />
+                              <small className="muted">
+                                Fonte: {field.origem}
+                              </small>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })}
                 <button
                   className="primary"
                   onClick={() => {
-                    const p = newProperty();
-                    p.name = String(
-                      aiPreview.name?.valor ?? "Imóvel importado",
-                    );
-                    p.location = String(aiPreview.location?.valor ?? "");
-                    for (const k of [
-                      "price",
-                      "area",
-                      "rooms",
-                      "baths",
-                      "parking",
-                    ] as const) {
-                      const v = aiPreview[k]?.valor;
-                      p[k] =
-                        v === null || v === "" || v === undefined
-                          ? null
-                          : Number(v);
-                    }
                     setAiOpen(false);
-                    open(p, true);
+                    open(propertyFromAi(aiPreview), true);
                   }}
                 >
                   Revisar no cadastro
