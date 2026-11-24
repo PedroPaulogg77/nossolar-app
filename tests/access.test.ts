@@ -32,12 +32,44 @@ it("migrações: casal compartilha espaço; terceiros e anônimos não acessam d
       ),
     );
     await db.exec(
+      await readFile(
+        new URL("../supabase/003_ai_import_success_limit.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await db.exec(
       `insert into private.allowed_members values('one@example.test'),('two@example.test');set role authenticated;set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';`,
     );
     const first = await db.query<{ id: string }>(
       "select public.ensure_household() id",
     );
     const hid = first.rows[0].id;
+    for (let i = 0; i < 10; i++)
+      await db.query("select public.reserve_ai_import($1) result", [
+        `failed-${i}`,
+      ]);
+    const afterFailures = await db.query<{ result: { reserved?: boolean } }>(
+      "select public.reserve_ai_import('valid') result",
+    );
+    expect(afterFailures.rows[0].result.reserved).toBe(true);
+    await db.query("select public.complete_ai_import('valid',$1::jsonb)", [
+      JSON.stringify({ name: { valor: "Exemplo" } }),
+    ]);
+    const cached = await db.query<{ result: { cached?: object } }>(
+      "select public.reserve_ai_import('valid') result",
+    );
+    expect(cached.rows[0].result.cached).toBeTruthy();
+    for (let i = 0; i < 9; i++) {
+      await db.query("select public.reserve_ai_import($1)", [`success-${i}`]);
+      await db.query("select public.complete_ai_import($1,$2::jsonb)", [
+        `success-${i}`,
+        JSON.stringify({ name: { valor: "Exemplo" } }),
+      ]);
+    }
+    const limit = await db.query<{ result: { limited?: boolean } }>(
+      "select public.reserve_ai_import('eleventh-success') result",
+    );
+    expect(limit.rows[0].result.limited).toBe(true);
     const p = initialProperty();
     await db.query("select public.save_household($1::jsonb)", [
       JSON.stringify({ version: 1, properties: [p], preferences: defaults }),

@@ -50,16 +50,16 @@ Antes de disponibilizar a conta, valide RLS: os dois membros compartilham dados;
 
 **Estado da configuração:** a conexão pública do projeto respondeu, mas a tabela `households` ainda não existia na última verificação. O SQL não foi aplicado ao projeto real: o controle do navegador foi interrompido por não conseguir confirmar sua URL. A conexão PostgreSQL fornecida contém um placeholder de senha. Execute o script local no SQL Editor para liberar conta e arquivos entre aparelhos.
 
-## Gemini opcional e somente gratuito
+## Gemini opcional
 
 Desativado por padrão. A integração atual extrai **texto colado** de anúncios. Links, PDF e imagem têm fallback manual explícito; não são buscados pelo backend, evitando SSRF e contorno de bloqueios.
 
 1. Use `gemini-3.5-flash-lite`. Em 24/11/2026, a [tabela oficial de preços](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite) indica entrada e saída de texto gratuitas no Free Tier, e a chave fornecida lista esse modelo com suporte a `generateContent`. Confirme que o projeto dessa chave está no Free Tier antes de ativar a integração; a lista de modelos não informa o plano de faturamento.
-2. Configure apenas no servidor `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED=true` e `GEMINI_FREE_TIER_CONFIRMED=true`. Esta última variável registra sua confirmação manual: a API não fornece uma garantia de que a conta não tem cobrança. Não ative em uma conta faturada.
-3. A importação exige login autorizado no Supabase. O espaço compartilhado tem limite persistente de 10 tentativas em 24h, reserva serializada, cache por hash/modelo durante 24h e até 50.000 caracteres. Se o modelo configurado falhar por erro de servidor, timeout ou resposta sem dados válidos, há uma única tentativa com `gemini-3.1-flash-lite`, que também tem Free Tier. Cada chamada tem timeout de 25s; a rota tem limite de 60s.
+2. Configure apenas no servidor `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED=true` e `GEMINI_FREE_TIER_CONFIRMED=true` para a conta gratuita. Se o projeto for convertido em conta paga, configure `GEMINI_BILLING_MODE=paid`; os custos devem ser monitorados no AI Studio. Nunca coloque a chave em `NEXT_PUBLIC_`.
+3. A importação exige login autorizado no Supabase. Aplique `supabase/003_ai_import_success_limit.sql`: o espaço compartilhado tem limite persistente de 10 importações concluídas e 50 tentativas em 24h; falhas não consomem a cota de importações concluídas. O cache por hash/modelo dura 24h e o texto pode ter até 50.000 caracteres. Se o modelo configurado falhar por erro de servidor, timeout ou resposta sem dados válidos, há uma única tentativa com `gemini-3.1-flash-lite`. Cada chamada tem timeout de 25s; a rota tem limite de 60s.
 4. O usuário autoriza o envio do texto, vê a política do Free Tier e revisa valores/fontes antes de salvar. Não envie dados financeiros pessoais. A chave só existe na rota do servidor; não é enviada ao navegador nem registrada em logs.
 
-Um 429 retorna: “O limite gratuito foi atingido. Continue cadastrando manualmente.” Nenhum resultado atribui notas. O backend valida a resposta com Zod.
+Os limites do aplicativo e os erros de cota do Google apresentam mensagens diferentes. Nenhum resultado atribui notas. O backend valida a resposta com Zod.
 
 ## Vercel Hobby
 

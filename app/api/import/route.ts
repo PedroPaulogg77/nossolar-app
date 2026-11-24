@@ -10,7 +10,8 @@ const fail = (error: string, status: number) =>
 export async function POST(req: NextRequest) {
   if (
     process.env.AI_ENABLED !== "true" ||
-    process.env.GEMINI_FREE_TIER_CONFIRMED !== "true" ||
+    (process.env.GEMINI_FREE_TIER_CONFIRMED !== "true" &&
+      process.env.GEMINI_BILLING_MODE !== "paid") ||
     !process.env.GEMINI_API_KEY ||
     !process.env.GEMINI_MODEL
   )
@@ -68,7 +69,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ fields: reservation.cached });
     if (reservation.limited)
       return fail(
-        "O limite gratuito foi atingido. Continue cadastrando manualmente.",
+        "O limite do aplicativo de 10 importações concluídas em 24 horas foi atingido.",
+        429,
+      );
+    if (reservation.attempt_limit)
+      return fail(
+        "O limite de tentativas do aplicativo foi atingido. Tente novamente em até 24 horas.",
         429,
       );
     const model = process.env.GEMINI_MODEL;
@@ -118,7 +124,7 @@ export async function POST(req: NextRequest) {
       }
       if (response.status === 429)
         return fail(
-          "O limite gratuito foi atingido. Continue cadastrando manualmente.",
+          "O Google limitou temporariamente as chamadas deste projeto. Confira a cota no AI Studio.",
           429,
         );
       if (!response.ok) {
