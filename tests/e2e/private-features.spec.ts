@@ -196,3 +196,36 @@ test("rejeita arquivo disfarçado e mostra foto real anexada no card", async ({
     page.getByRole("img", { name: "Foto de Cobertura em avaliação" }),
   ).toBeVisible();
 });
+
+test("cola foto diretamente na ficha do imóvel", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.evaluate(() => {
+    const bytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      ),
+      (char) => char.charCodeAt(0),
+    );
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(
+      new File([bytes], "imagem.png", { type: "image/png" }),
+    );
+    document
+      .querySelector(".attachments-section .attachment-paste")
+      ?.dispatchEvent(
+        new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData,
+        }),
+      );
+  });
+  await expect(
+    page.getByRole("button", { name: /foto-colada\.png\s+Foto/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(
+    page.getByRole("img", { name: "Foto de Cobertura em avaliação" }),
+  ).toBeVisible();
+});

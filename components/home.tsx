@@ -55,8 +55,14 @@ import {
   locationOptions,
   matchesLocation,
 } from "@/lib/locations";
-import { packFiles, restoreFiles, syncFiles } from "@/lib/attachments";
+import { packFiles, putFile, restoreFiles, syncFiles } from "@/lib/attachments";
 import { propertyFromAi, type AiPreview } from "@/lib/ai-import";
+import { imageFromClipboard } from "@/lib/clipboard-image";
+import {
+  validateFile,
+  MAX_TOTAL_SIZE,
+  type Attachment,
+} from "@/lib/attachment-types";
 const STORAGE = "nosso-lar-v1";
 const aiGroups = [
   {
@@ -100,6 +106,10 @@ const aiGroups = [
       ["installments", "Parcelas da entrada"],
       ["payment", "Prestação anunciada (R$/mês)"],
     ],
+  },
+  {
+    title: "Outros detalhes do anúncio",
+    fields: [["highlights", "Destaques encontrados"]],
   },
 ] as const;
 const aiNumericKeys = new Set([
@@ -259,7 +269,16 @@ export default function Home({
     [busy, setBusy] = useState(false),
     [aiOpen, setAiOpen] = useState(false),
     [aiText, setAiText] = useState(""),
+    [aiUrl, setAiUrl] = useState(""),
+    [aiImage, setAiImage] = useState<File | null>(null),
+    [aiImageUrl, setAiImageUrl] = useState(""),
     [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
+  useEffect(() => {
+    if (!aiImage) return;
+    const url = URL.createObjectURL(aiImage);
+    setAiImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [aiImage]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE);
@@ -767,6 +786,16 @@ export default function Home({
                             </span>
                           </div>
                         </button>
+                        {safeLink(p.url) && (
+                          <a
+                            className="card-source-link"
+                            href={p.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Abrir anúncio <ArrowUpRight size={14} />
+                          </a>
+                        )}
                       </article>
                     ))}
                     <button
@@ -1322,15 +1351,36 @@ export default function Home({
                     </label>
                   </div>
                 </div>
+                <Field
+                  label="Link original do anúncio"
+                  type="url"
+                  value={draft.url}
+                  onChange={(v) => update("url", v)}
+                />
+                {safeLink(draft.url) && (
+                  <a
+                    className="text-button"
+                    href={draft.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Abrir anúncio <ArrowUpRight size={14} />
+                  </a>
+                )}
+                <label className="field">
+                  <span>Destaques do anúncio</span>
+                  <textarea
+                    maxLength={2000}
+                    value={draft.listingHighlights}
+                    onChange={(e) =>
+                      update("listingHighlights", e.target.value)
+                    }
+                    placeholder="Lazer, acabamentos, localização ou condições mencionadas no anúncio"
+                  />
+                </label>
                 <details>
-                  <summary>Link do anúncio e detalhes opcionais</summary>
+                  <summary>Outros detalhes opcionais</summary>
                   <div className="form-grid">
-                    <Field
-                      label="Link original do anúncio"
-                      type="url"
-                      value={draft.url}
-                      onChange={(v) => update("url", v)}
-                    />
                     <Field
                       label="URL da foto real do anúncio"
                       type="url"
@@ -1397,16 +1447,6 @@ export default function Home({
                       </label>
                     ))}
                   </div>
-                  {safeLink(draft.url) && (
-                    <a
-                      className="text-button"
-                      href={draft.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Abrir anúncio <ArrowUpRight size={14} />
-                    </a>
-                  )}
                 </details>
                 {!isNew && (
                   <details>
@@ -2023,6 +2063,52 @@ export default function Home({
           onClose={() => setAiOpen(false)}
         >
           <div className="dialog-body">
+            <label className="field">
+              <span>Link do anúncio para guardar na ficha</span>
+              <input
+                type="url"
+                placeholder="https://..."
+                value={aiUrl}
+                onChange={(e) => setAiUrl(e.target.value)}
+              />
+            </label>
+            <div
+              className="attachment-paste"
+              tabIndex={0}
+              onPaste={(event) => {
+                try {
+                  const image = imageFromClipboard(event.clipboardData);
+                  if (!image) return;
+                  event.preventDefault();
+                  setAiImage(image);
+                  setNotice("Foto pronta para acompanhar este imóvel.");
+                } catch (error) {
+                  setNotice(
+                    error instanceof Error ? error.message : "Imagem inválida.",
+                  );
+                }
+              }}
+            >
+              Clique aqui e cole uma foto com Ctrl+V. A imagem ficará na ficha
+              do imóvel.
+            </div>
+            {aiImage && (
+              <div className="pasted-photo-preview">
+                {aiImageUrl && (
+                  <img src={aiImageUrl} alt="Foto colada para este imóvel" />
+                )}
+                <span>Foto pronta</span>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setAiImage(null);
+                    setAiImageUrl("");
+                  }}
+                >
+                  Remover
+                </button>
+              </div>
+            )}
             {!aiPreview && (
               <>
                 <p className="hint">
@@ -2032,9 +2118,9 @@ export default function Home({
                   {aiProvider === "Gemini"
                     ? "No Free Tier, o provedor pode usar os dados para melhorar seus produtos."
                     : "O Groq não retém solicitações de inferência por padrão; consulte os controles de dados da sua conta."}
-                  Revise todos os campos antes de salvar. Leitura direta de
-                  links e arquivos indisponível nesta versão; cole o texto do
-                  anúncio.
+                  Revise todos os campos antes de salvar. O link será guardado
+                  na ficha, sem leitura automática; cole o texto do anúncio para
+                  a análise.
                 </p>
                 <label className="field">
                   <span>
@@ -2108,25 +2194,43 @@ export default function Home({
                           const field = aiPreview[key];
                           return (
                             <div key={key}>
-                              <Field
-                                label={label}
-                                type={
-                                  aiNumericKeys.has(key) ? "number" : "text"
-                                }
-                                value={
-                                  typeof field.valor === "boolean"
-                                    ? field.valor
-                                      ? "Sim"
-                                      : "Não"
-                                    : String(field.valor ?? "")
-                                }
-                                onChange={(value) =>
-                                  setAiPreview({
-                                    ...aiPreview,
-                                    [key]: { ...field, valor: value },
-                                  })
-                                }
-                              />
+                              {key === "highlights" ? (
+                                <label className="field">
+                                  <span>{label}</span>
+                                  <textarea
+                                    value={String(field.valor ?? "")}
+                                    onChange={(event) =>
+                                      setAiPreview({
+                                        ...aiPreview,
+                                        [key]: {
+                                          ...field,
+                                          valor: event.target.value,
+                                        },
+                                      })
+                                    }
+                                  />
+                                </label>
+                              ) : (
+                                <Field
+                                  label={label}
+                                  type={
+                                    aiNumericKeys.has(key) ? "number" : "text"
+                                  }
+                                  value={
+                                    typeof field.valor === "boolean"
+                                      ? field.valor
+                                        ? "Sim"
+                                        : "Não"
+                                      : String(field.valor ?? "")
+                                  }
+                                  onChange={(value) =>
+                                    setAiPreview({
+                                      ...aiPreview,
+                                      [key]: { ...field, valor: value },
+                                    })
+                                  }
+                                />
+                              )}
                               <small className="muted">
                                 Fonte: {field.origem}
                               </small>
@@ -2139,9 +2243,58 @@ export default function Home({
                 })}
                 <button
                   className="primary"
-                  onClick={() => {
-                    setAiOpen(false);
-                    open(propertyFromAi(aiPreview), true);
+                  disabled={busy}
+                  onClick={async () => {
+                    if (aiUrl.trim() && !safeLink(aiUrl.trim())) {
+                      setNotice(
+                        "Cole um link que comece com https:// ou http://.",
+                      );
+                      return;
+                    }
+                    setBusy(true);
+                    try {
+                      const property = propertyFromAi(aiPreview);
+                      property.url = aiUrl.trim();
+                      if (aiImage) {
+                        const otherBytes = properties.reduce(
+                          (total, item) =>
+                            total +
+                            item.attachments.reduce(
+                              (sum, file) => sum + file.size,
+                              0,
+                            ),
+                          0,
+                        );
+                        if (otherBytes + aiImage.size > MAX_TOTAL_SIZE)
+                          throw Error(
+                            "O limite de 100 MB de anexos foi atingido.",
+                          );
+                        const mime = await validateFile(aiImage, aiImage.name);
+                        const photo: Attachment = {
+                          id: crypto.randomUUID(),
+                          name: aiImage.name,
+                          size: aiImage.size,
+                          mime,
+                          category: "Foto",
+                          createdAt: new Date().toISOString(),
+                        };
+                        await putFile(photo.id, aiImage);
+                        property.attachments = [photo];
+                      }
+                      setAiOpen(false);
+                      setAiImage(null);
+                      setAiImageUrl("");
+                      setAiUrl("");
+                      open(property, true);
+                    } catch (error) {
+                      setNotice(
+                        error instanceof Error
+                          ? error.message
+                          : "Não foi possível guardar a foto.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
                 >
                   Revisar no cadastro

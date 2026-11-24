@@ -21,12 +21,14 @@ describe("Bairros, cidades e arquivos privados", () => {
       city: undefined,
       neighborhood: undefined,
       attachments: undefined,
+      listingHighlights: undefined,
     };
     const migrated = propertySchema.parse({ ...old, name: "Meu imóvel" });
     expect(migrated.city).toBe("");
     expect(migrated.neighborhood).toBe("");
     expect(propertyLocation(migrated)).toBe("Centro / São Paulo");
     expect(migrated.attachments).toEqual([]);
+    expect(migrated.listingHighlights).toBe("");
   });
   it("gera filtros distintos, sem duplicar acentos, caixa ou espaços", () => {
     const a = { ...newProperty(), city: "São Paulo", neighborhood: "Centro" },

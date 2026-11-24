@@ -42,10 +42,11 @@ describe("resposta do Gemini", () => {
 describe("resposta do Groq", () => {
   it("valida JSON de campos parciais antes de preencher o imóvel", () => {
     const parsed = parseAiFieldsText(
-      '{"name":{"valor":"Apartamento A","origem":"Apartamento A"},"parking":{"valor":2,"origem":"2 vagas"}}',
+      '{"name":{"valor":"Apartamento A","origem":"Apartamento A"},"parking":{"valor":2,"origem":"2 vagas"},"highlights":{"valor":"Piscina e coworking","origem":"Piscina e coworking"}}',
     );
     expect(parsed.reason).toBeNull();
     expect(parsed.fields?.parking?.valor).toBe(2);
+    expect(parsed.fields?.highlights?.valor).toContain("coworking");
     expect(parseAiFieldsText("{}").reason).toBe("NO_FACTS");
   });
 });

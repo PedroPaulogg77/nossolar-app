@@ -25,6 +25,7 @@ describe("importação do anúncio", () => {
       cashEntry: found(90000),
       installmentTotal: found(30000),
       installments: found(12),
+      highlights: found("Piscina e coworking; piso em porcelanato"),
     });
     expect(propertySchema.safeParse(property).success).toBe(true);
     expect(property.city).toBe("Campinas");
@@ -36,6 +37,7 @@ describe("importação do anúncio", () => {
     expect(property.finance.condo).toBe(650);
     expect(property.finance.installmentTotal).toBe(30000);
     expect(property.finance.split).toBe(true);
+    expect(property.listingHighlights).toContain("coworking");
   });
 
   it("mantém campos não informados pendentes sem inventar valores", () => {

@@ -647,6 +647,20 @@ main {
   color: var(--accent);
   white-space: nowrap;
 }
+.card-source-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding: 11px;
+  color: var(--accent);
+  font-size: 11px;
+  text-decoration: none;
+}
+.card-source-link:hover {
+  background: #f0f5ee;
+}
 .add-card {
   min-height: 390px;
   border: 1px dashed #ccd8ce;
@@ -1832,6 +1846,33 @@ input[type="checkbox"] {
 }
 .attachment-upload.disabled {
   opacity: 0.5;
+}
+.attachment-paste {
+  border: 1px dashed #aebfb0;
+  border-radius: 7px;
+  background: #f6f8f5;
+  color: #52665a;
+  padding: 14px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: text;
+}
+.attachment-paste:focus-visible {
+  outline: 3px solid #6ca69a;
+  outline-offset: 3px;
+}
+.pasted-photo-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.pasted-photo-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 7px;
 }
 .attachment-help {
   font-size: 11px;

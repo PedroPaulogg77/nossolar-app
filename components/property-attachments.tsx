@@ -16,6 +16,7 @@ import {
   validateFile,
 } from "@/lib/attachment-types";
 import { getFile, putFile } from "@/lib/attachments";
+import { imageFromClipboard } from "@/lib/clipboard-image";
 export function PropertyAttachments({
   files,
   onChange,
@@ -68,11 +69,10 @@ export function PropertyAttachments({
       );
     }
   }
-  async function add(list: FileList | null) {
-    if (!list) return;
+  async function add(incoming: File[]) {
+    if (!incoming.length) return;
     setBusy(true);
     try {
-      const incoming = [...list];
       if (files.length + incoming.length > MAX_PROPERTY_FILES)
         throw Error("Guarde até 20 arquivos por imóvel.");
       if (
@@ -146,11 +146,30 @@ export function PropertyAttachments({
             accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx"
             multiple
             onChange={(e) => {
-              void add(e.target.files);
+              void add(e.target.files ? [...e.target.files] : []);
               e.target.value = "";
             }}
           />
         </label>
+      </div>
+      <div
+        className="attachment-paste"
+        tabIndex={0}
+        onPaste={(event) => {
+          try {
+            const image = imageFromClipboard(event.clipboardData);
+            if (!image) return;
+            event.preventDefault();
+            void add([image]);
+          } catch (error) {
+            onNotice(
+              error instanceof Error ? error.message : "Imagem inválida.",
+            );
+          }
+        }}
+      >
+        Clique aqui e cole uma foto com Ctrl+V. A primeira foto aparece na capa
+        do imóvel.
       </div>
       <p className="attachment-help">
         PDF, fotos, Word ou Excel · até 10 MB por arquivo. Os anexos não são

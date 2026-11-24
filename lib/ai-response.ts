@@ -30,6 +30,7 @@ const fields = z
     installmentTotal: field,
     installments: field,
     payment: field,
+    highlights: field,
   })
   .partial();
 

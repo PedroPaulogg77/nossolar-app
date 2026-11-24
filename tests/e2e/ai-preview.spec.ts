@@ -39,6 +39,11 @@ test("prévia da IA organiza dados e abre cadastro preenchido", async ({
             origem: "condomínio R$ 650",
             confianca: "extraído",
           },
+          highlights: {
+            valor: "Piscina e coworking; piso em porcelanato",
+            origem: "piscina, coworking, piso em porcelanato",
+            confianca: "extraído",
+          },
         },
       },
     }),
@@ -46,11 +51,37 @@ test("prévia da IA organiza dados e abre cadastro preenchido", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Importar anúncio com IA" }).click();
   await page
+    .getByLabel("Link do anúncio para guardar na ficha")
+    .fill("https://example.com/imovel/123");
+  await page.evaluate(() => {
+    const bytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      ),
+      (char) => char.charCodeAt(0),
+    );
+    const file = new File([bytes], "imagem.png", { type: "image/png" });
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(file);
+    const target = document.querySelector(".dialog-body .attachment-paste");
+    target?.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData,
+      }),
+    );
+  });
+  await expect(page.getByText("Foto pronta", { exact: true })).toBeVisible();
+  await page
     .getByLabel("Texto da página do anúncio")
     .fill("Residencial de teste com três quartos em Campinas, Cambuí.");
   await page.getByRole("button", { name: "Autorizar e extrair texto" }).click();
   await expect(page.getByRole("heading", { name: "Onde fica" })).toBeVisible();
   await expect(page.getByLabel("Suítes", { exact: true })).toHaveValue("1");
+  await expect(page.getByLabel("Destaques encontrados")).toContainText(
+    "coworking",
+  );
   await page.screenshot({
     path: "test-results/ai-preview-desktop.png",
     fullPage: true,
@@ -72,4 +103,13 @@ test("prévia da IA organiza dados e abre cadastro preenchido", async ({
   await expect(page.getByLabel("Bairro", { exact: true })).toHaveValue(
     "Cambuí",
   );
+  await expect(page.getByLabel("Link original do anúncio")).toHaveValue(
+    "https://example.com/imovel/123",
+  );
+  await expect(page.getByLabel("Destaques do anúncio")).toContainText(
+    "coworking",
+  );
+  await expect(
+    page.getByRole("button", { name: /foto-colada\.png\s+Foto/ }),
+  ).toBeVisible();
 });

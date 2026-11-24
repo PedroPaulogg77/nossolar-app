@@ -36,6 +36,10 @@ function boolean(value: AiField["valor"] | undefined) {
 export function propertyFromAi(fields: AiPreview): Property {
   const property = newProperty();
   property.name = String(fields.name?.valor ?? "Imóvel importado");
+  property.listingHighlights = String(fields.highlights?.valor ?? "").slice(
+    0,
+    2000,
+  );
   for (const key of [
     "city",
     "neighborhood",

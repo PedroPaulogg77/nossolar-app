@@ -25,8 +25,8 @@ Os imóveis criados pelos testes são dados de teste isolados, nunca conteúdo i
 
 ## Fluxos disponíveis
 
-- **Imóveis:** cadastro, edição, favoritos, status e checklist. Cidade e bairro separados geram filtros automaticamente; bairros são filtrados pela cidade. Valores antigos são preservados sem inferir a separação.
-- **Anexos por imóvel:** fotos, planos de pagamento e documentos. PDF, JPG, PNG, WebP, DOCX e XLSX; até 10 MB/arquivo, 20 arquivos/imóvel e 100 MB referenciados no espaço. Prévia de imagens/PDF e download; primeira foto anexada pode ser a capa. Anexos não são enviados para IA. A cópia JSON inclui os bytes dos arquivos e pode ser restaurada em outro navegador.
+- **Imóveis:** cadastro, edição, favoritos, status e checklist. Cidade e bairro separados geram filtros automaticamente; bairros são filtrados pela cidade. O link original fica na ficha e pode ser aberto pelo card. Destaques factuais do anúncio ficam separados das anotações pessoais. Valores antigos são preservados sem inferir a separação.
+- **Anexos por imóvel:** fotos, planos de pagamento e documentos. PDF, JPG, PNG, WebP, DOCX e XLSX; até 10 MB/arquivo, 20 arquivos/imóvel e 100 MB referenciados no espaço. É possível colar uma foto com Ctrl+V na ficha ou na importação com IA; a primeira foto anexada pode ser a capa. Anexos não são enviados para IA. A cópia JSON inclui os bytes dos arquivos e pode ser restaurada em outro navegador.
 - **Comparar:** duas ou três opções; métricas sem preencher desconhecidos com zero; nota consensual ponderada e requisitos configuráveis.
 - **Finanças:** entrada em dinheiro informada diretamente, parte à vista e parte parcelada, reserva atual editável e diferença para entrada/documentação/gastos eventuais; prestação real informada, condomínio, IPTU anual dividido por 12, obra fixa com vigência e fluxo interativo de 12 meses. Valores antigos de FGTS e subsídio continuam preservados nos dados, sem campos na interface.
 - **Preferências:** renda, teto, requisitos, pesos, exportação/importação JSON e cópia manual na nuvem.
@@ -52,7 +52,7 @@ Antes de disponibilizar a conta, valide RLS: os dois membros compartilham dados;
 
 ## Gemini opcional
 
-Desativado por padrão. A integração atual extrai **texto colado** de anúncios. Links, PDF e imagem têm fallback manual explícito; não são buscados pelo backend, evitando SSRF e contorno de bloqueios.
+Desativado por padrão. A integração atual extrai **texto colado** de anúncios, inclusive destaques qualitativos que podem ser revisados antes de salvar. O link do anúncio é guardado para consulta posterior e uma foto pode ser colada na mesma etapa. Links, PDF e imagem não são analisados pelo backend; somente o texto colado é enviado à IA.
 
 1. Use `gemini-3.5-flash-lite`. Em 24/11/2026, a [tabela oficial de preços](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite) indica entrada e saída de texto gratuitas no Free Tier, e a chave fornecida lista esse modelo com suporte a `generateContent`. Confirme que o projeto dessa chave está no Free Tier antes de ativar a integração; a lista de modelos não informa o plano de faturamento.
 2. Configure apenas no servidor `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED=true` e `GEMINI_FREE_TIER_CONFIRMED=true` para a conta gratuita. Se o projeto for convertido em conta paga, configure `GEMINI_BILLING_MODE=paid`; os custos devem ser monitorados no AI Studio. Nunca coloque a chave em `NEXT_PUBLIC_`.
