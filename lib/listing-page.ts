@@ -113,7 +113,11 @@ async function download(url: URL): Promise<{
       url,
       {
         method: "GET",
-        lookup: (_host, _options, callback) => callback(null, address, 4),
+        family: 4,
+        lookup: (_host, options, callback) =>
+          options.all
+            ? callback(null, [{ address, family: 4 }])
+            : callback(null, address, 4),
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; NossoLar/1.0)",
           Accept: "text/html,application/xhtml+xml",
