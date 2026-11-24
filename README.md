@@ -54,7 +54,7 @@ Antes de disponibilizar a conta, valide RLS: os dois membros compartilham dados;
 
 Desativado por padrão. A integração atual extrai **texto colado** de anúncios. Links, PDF e imagem têm fallback manual explícito; não são buscados pelo backend, evitando SSRF e contorno de bloqueios.
 
-1. Consulte a [tabela oficial de preços](https://ai.google.dev/gemini-api/docs/pricing) e os modelos disponíveis **na sua conta**, sem billing. Não há modelo predefinido nem fallback.
+1. Use `gemini-3.5-flash-lite`. Em 24/11/2026, a [tabela oficial de preços](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite) indica entrada e saída de texto gratuitas no Free Tier, e a chave fornecida lista esse modelo com suporte a `generateContent`. Confirme que o projeto dessa chave está no Free Tier antes de ativar a integração; a lista de modelos não informa o plano de faturamento.
 2. Configure apenas no servidor `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED=true` e `GEMINI_FREE_TIER_CONFIRMED=true`. Esta última variável registra sua confirmação manual: a API não fornece uma garantia de que a conta não tem cobrança. Não ative em uma conta faturada.
 3. A importação exige login autorizado no Supabase. O espaço compartilhado tem limite persistente de 10 tentativas em 24h, reserva serializada, cache por hash/modelo durante 24h, até 12.000 caracteres e timeout de 20s. Não há retentativas automáticas.
 4. O usuário autoriza o envio do texto, vê a política do Free Tier e revisa valores/fontes antes de salvar. Não envie dados financeiros pessoais. A chave só existe na rota do servidor; não é enviada ao navegador nem registrada em logs.
