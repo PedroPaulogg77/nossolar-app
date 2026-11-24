@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAiResponse } from "../lib/ai-response";
+import { parseAiFieldsText, parseAiResponse } from "../lib/ai-response";
 
 describe("resposta do Gemini", () => {
   it("aceita campos parciais e ignora partes de raciocínio", () => {
@@ -36,5 +36,16 @@ describe("resposta do Gemini", () => {
         candidates: [{ content: { parts: [{ text: "{incompleto" }] } }],
       }).reason,
     ).toBe("INVALID_JSON");
+  });
+});
+
+describe("resposta do Groq", () => {
+  it("valida JSON de campos parciais antes de preencher o imóvel", () => {
+    const parsed = parseAiFieldsText(
+      '{"name":{"valor":"Apartamento A","origem":"Apartamento A"},"parking":{"valor":2,"origem":"2 vagas"}}',
+    );
+    expect(parsed.reason).toBeNull();
+    expect(parsed.fields?.parking?.valor).toBe(2);
+    expect(parseAiFieldsText("{}").reason).toBe("NO_FACTS");
   });
 });

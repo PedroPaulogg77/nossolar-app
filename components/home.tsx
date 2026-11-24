@@ -225,7 +225,13 @@ function Placeholder() {
     </div>
   );
 }
-export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
+export default function Home({
+  aiEnabled,
+  aiProvider,
+}: {
+  aiEnabled: boolean;
+  aiProvider: "Groq" | "Gemini";
+}) {
   const [properties, setProperties] = useState<Property[]>([]),
     [prefs, setPrefs] = useState(defaults),
     [ready, setReady] = useState(false),
@@ -2022,8 +2028,10 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
                 <p className="hint">
                   Pode copiar a página inteira do anúncio. A IA tentará ignorar
                   menus, anúncios e textos de outros imóveis. Ao extrair, você
-                  autoriza o envio deste texto ao Gemini. No Free Tier, o
-                  provedor pode usar os dados para melhorar seus produtos.
+                  autoriza o envio deste texto ao {aiProvider}.{" "}
+                  {aiProvider === "Gemini"
+                    ? "No Free Tier, o provedor pode usar os dados para melhorar seus produtos."
+                    : "O Groq não retém solicitações de inferência por padrão; consulte os controles de dados da sua conta."}
                   Revise todos os campos antes de salvar. Leitura direta de
                   links e arquivos indisponível nesta versão; cole o texto do
                   anúncio.

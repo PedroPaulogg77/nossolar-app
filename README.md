@@ -61,6 +61,10 @@ Desativado por padrão. A integração atual extrai **texto colado** de anúncio
 
 Os limites do aplicativo e os erros de cota do Google apresentam mensagens diferentes. Nenhum resultado atribui notas. O backend valida a resposta com Zod.
 
+## Groq para importação
+
+Configure `GROQ_API_KEY` apenas em Environment Variables do Vercel e mantenha `AI_ENABLED=true`. Quando a chave Groq estiver presente, o aplicativo usa `openai/gpt-oss-20b` no Groq para extrair o anúncio; sem ela, continua usando Gemini. Não é necessário mudar o Supabase. O texto público do anúncio é enviado somente ao provedor ativo, e o aplicativo mostra qual provedor receberá o texto antes do envio. A resposta passa pela mesma validação de campos e pela revisão antes de salvar. O Groq oferece camada gratuita com limites por conta/modelo; consulte os limites da sua organização antes de ativar cobrança.
+
 ## Vercel Hobby
 
 Importe este repositório para um projeto Hobby; framework Next.js, comando de build `npm run build`. Configure as variáveis no painel Environment Variables e as URLs de Auth do Supabase. Não é preciso adicionar cartão, ativar Pro ou instalar serviços extras. Confirme que seu uso continua pessoal e não comercial conforme os [termos do Hobby](https://vercel.com/docs/plans/hobby). Se quotas gratuitas acabarem, aguarde o reset; não faça upgrade automático.

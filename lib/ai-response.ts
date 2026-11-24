@@ -49,6 +49,10 @@ export function parseAiResponse(result: GeminiResult) {
     .trim();
   if (!text)
     return { fields: null, reason: candidate?.finishReason ?? "EMPTY" };
+  return parseAiFieldsText(text);
+}
+
+export function parseAiFieldsText(text: string) {
   let json: unknown;
   try {
     json = JSON.parse(
