@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { seedTestProperty } from "./seed";
+test.beforeEach(async ({ page }) => seedTestProperty(page));
 test("cadastro, persistência, comparação, avaliação e finanças", async ({
   page,
 }) => {

@@ -223,13 +223,40 @@ main {
 .topbar {
   height: 68px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   border-bottom: 1px solid var(--line);
   padding: 0 44px;
   font-size: 11px;
   color: var(--muted);
   background: #fbfcfb;
+}
+.topbar > span:first-child {
+  display: none;
+}
+.collection-empty {
+  margin: 16px 0 32px;
+  padding: 36px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8faf7;
+  text-align: center;
+  color: var(--accent);
+}
+.collection-empty h3 {
+  margin: 12px 0 6px;
+  font-size: 17px;
+  color: var(--ink);
+}
+.collection-empty p {
+  margin: 0 auto 18px;
+  max-width: 360px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.collection-empty .secondary {
+  margin: auto;
 }
 .topbar > span:last-child {
   display: flex;
@@ -1379,16 +1406,17 @@ input[type="checkbox"] {
     height: 52px;
     padding: 0 20px;
     font-size: 9px;
+    justify-content: space-between;
   }
   .topbar > span:first-child {
-    font-size: 0;
-  }
-  .topbar > span:first-child:before {
-    content: "nosso lar.";
+    display: inline;
     font-size: 21px;
     font-weight: 600;
     letter-spacing: -1px;
     color: var(--accent);
+  }
+  .topbar > span:first-child:before {
+    content: none;
   }
   .page {
     padding: 28px 20px 0;

@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs/promises";
+import { seedTestProperty } from "./seed";
+test.beforeEach(async ({ page }) => seedTestProperty(page));
 test("endereço publicado mostra somente a entrada privada sem sessão", async ({
   page,
 }) => {

@@ -18,7 +18,6 @@ import {
   Wallet,
   Columns3,
   X,
-  ShieldCheck,
   MoveUpRight,
   Upload,
   Trash2,
@@ -29,7 +28,6 @@ import {
   Preferences,
   Finance,
   defaults,
-  initialProperty,
   newProperty,
   money,
   documentation,
@@ -286,7 +284,7 @@ export default function Home({
         const data = backupSchema.parse(JSON.parse(raw));
         setProperties(data.properties);
         setPrefs(data.preferences);
-      } else setProperties([initialProperty()]);
+      } else setProperties([]);
     } catch {
       setNotice(
         "Não foi possível ler os dados locais. Importe um backup; o arquivo original foi preservado.",
@@ -458,56 +456,61 @@ export default function Home({
             ? bv - av
             : av - bv;
     });
-  const locationFilters = (
-    <div className="location-filters">
-      <label>
-        Cidade
-        <select
-          aria-label="Filtrar por cidade"
-          value={cityFilter}
-          onChange={(e) => {
-            setCityFilter(e.target.value);
-            setNeighborhoodFilter("");
-          }}
-        >
-          <option value="">Todas as cidades</option>
-          {locationOptions(properties, "city").map(([key, label]) => (
-            <option value={key} key={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Bairro
-        <select
-          aria-label="Filtrar por bairro"
-          value={neighborhoodFilter}
-          onChange={(e) => setNeighborhoodFilter(e.target.value)}
-        >
-          <option value="">Todos os bairros</option>
-          {locationOptions(properties, "neighborhood", cityFilter).map(
-            ([key, label]) => (
+  const cityOptions = locationOptions(properties, "city");
+  const neighborhoodOptions = locationOptions(
+    properties,
+    "neighborhood",
+    cityFilter,
+  );
+  const locationFilters =
+    cityOptions.length || neighborhoodOptions.length ? (
+      <div className="location-filters">
+        <label>
+          Cidade
+          <select
+            aria-label="Filtrar por cidade"
+            value={cityFilter}
+            onChange={(e) => {
+              setCityFilter(e.target.value);
+              setNeighborhoodFilter("");
+            }}
+          >
+            <option value="">Todas as cidades</option>
+            {cityOptions.map(([key, label]) => (
               <option value={key} key={key}>
                 {label}
               </option>
-            ),
-          )}
-        </select>
-      </label>
-      {(cityFilter || neighborhoodFilter) && (
-        <button
-          className="text-button"
-          onClick={() => {
-            setCityFilter("");
-            setNeighborhoodFilter("");
-          }}
-        >
-          Limpar localização <X size={14} />
-        </button>
-      )}
-    </div>
-  );
+            ))}
+          </select>
+        </label>
+        <label>
+          Bairro
+          <select
+            aria-label="Filtrar por bairro"
+            value={neighborhoodFilter}
+            onChange={(e) => setNeighborhoodFilter(e.target.value)}
+          >
+            <option value="">Todos os bairros</option>
+            {neighborhoodOptions.map(([key, label]) => (
+              <option value={key} key={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(cityFilter || neighborhoodFilter) && (
+          <button
+            className="text-button"
+            onClick={() => {
+              setCityFilter("");
+              setNeighborhoodFilter("");
+            }}
+          >
+            Limpar localização <X size={14} />
+          </button>
+        )}
+      </div>
+    ) : null;
   const current = properties.find((p) => p.id === financialId) ?? properties[0];
   const flow = current ? cashflow(current, start) : null;
   const toggle = (id: string) =>
@@ -529,10 +532,6 @@ export default function Home({
           </span>
           nosso lar<span className="brand-dot">.</span>
         </a>
-        <div className="workspace">
-          <span className="eyebrow">SÓ NÓS DOIS</span>
-          <p>Nossa busca, nosso ritmo.</p>
-        </div>
         <nav aria-label="Navegação principal">
           {[
             { name: "Imóveis", icon: LayoutGrid },
@@ -553,12 +552,6 @@ export default function Home({
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="private">
-            <ShieldCheck size={18} />
-            <div>
-              Nosso cantinho.<small>Guardado neste aparelho</small>
-            </div>
-          </div>
           <button
             className="nav-item"
             onClick={() => {
@@ -569,19 +562,13 @@ export default function Home({
             <Settings2 size={18} />
             Preferências
           </button>
-          <div className="profile">
-            <span>N</span>
-            <div>
-              Nosso primeiro lar<small>Um passo de cada vez</small>
-            </div>
-          </div>
         </div>
       </aside>
       <main>
         <div className="topbar">
-          <span>Nosso primeiro lar</span>
+          <span>nosso lar.</span>
           <span>
-            <span className="status-dot" /> Só nosso
+            <span className="status-dot" /> Espaço privado
             <button
               className="icon-button mobile-settings"
               aria-label="Preferências"
@@ -619,7 +606,7 @@ export default function Home({
                     : "A entrada, as parcelas e o que precisamos reservar."}
               </p>
             </div>
-            {tab === "Imóveis" && (
+            {tab === "Imóveis" && properties.length > 0 && (
               <button
                 className="primary"
                 onClick={() => open(newProperty(), true)}
@@ -651,58 +638,62 @@ export default function Home({
                       </button>
                     )}
                   </div>
-                  <div className="toolbar">
-                    <div className="filters">
-                      {[
-                        "Todos",
-                        "Favoritos",
-                        "Em avaliação",
-                        ...(more ? ["Visitados", "Prontos", "Na planta"] : []),
-                      ].map((f) => (
-                        <button
-                          className={filter === f ? "chip selected" : "chip"}
-                          key={f}
-                          onClick={() => setFilter(f)}
-                        >
-                          {f === "Favoritos" && <Heart size={13} />} {f}
-                        </button>
-                      ))}
-                      <button
-                        className="icon-button"
-                        aria-label="Mais filtros"
-                        onClick={() => setMore(!more)}
-                      >
-                        <SlidersHorizontal size={16} />
-                      </button>
-                    </div>
-                    <div className="search-sort">
-                      <label className="search">
-                        <Search size={16} />
-                        <input
-                          aria-label="Buscar imóvel"
-                          placeholder="Buscar imóvel"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                      </label>
-                      <select
-                        aria-label="Ordenar imóveis"
-                        value={sort}
-                        onChange={(e) => setSort(e.target.value)}
-                      >
+                  {properties.length > 0 && (
+                    <div className="toolbar">
+                      <div className="filters">
                         {[
+                          "Todos",
                           "Favoritos",
-                          "Menor preço",
-                          "Melhor nota",
-                          "Menor entrada",
-                          "Menor mensalidade",
-                        ].map((s) => (
-                          <option key={s}>{s}</option>
+                          "Em avaliação",
+                          ...(more
+                            ? ["Visitados", "Prontos", "Na planta"]
+                            : []),
+                        ].map((f) => (
+                          <button
+                            className={filter === f ? "chip selected" : "chip"}
+                            key={f}
+                            onClick={() => setFilter(f)}
+                          >
+                            {f === "Favoritos" && <Heart size={13} />} {f}
+                          </button>
                         ))}
-                      </select>
+                        <button
+                          className="icon-button"
+                          aria-label="Mais filtros"
+                          onClick={() => setMore(!more)}
+                        >
+                          <SlidersHorizontal size={16} />
+                        </button>
+                      </div>
+                      <div className="search-sort">
+                        <label className="search">
+                          <Search size={16} />
+                          <input
+                            aria-label="Buscar imóvel"
+                            placeholder="Buscar imóvel"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                        </label>
+                        <select
+                          aria-label="Ordenar imóveis"
+                          value={sort}
+                          onChange={(e) => setSort(e.target.value)}
+                        >
+                          {[
+                            "Favoritos",
+                            "Menor preço",
+                            "Melhor nota",
+                            "Menor entrada",
+                            "Menor mensalidade",
+                          ].map((s) => (
+                            <option key={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                  {locationFilters}
+                  )}
+                  {properties.length > 0 && locationFilters}
                   <div className="property-grid">
                     {visible.map((p) => (
                       <article className="property-card" key={p.id}>
@@ -798,36 +789,43 @@ export default function Home({
                         )}
                       </article>
                     ))}
-                    <button
-                      className="add-card"
-                      onClick={() => open(newProperty(), true)}
-                    >
-                      <span>
-                        <Plus size={24} />
-                      </span>
-                      <h3>Mais um lugar para conhecer</h3>
-                      <p>
-                        Guarde um imóvel que chamou
-                        <br />a atenção de vocês.
-                      </p>
-                      <b>
-                        Guardar na nossa lista <ArrowRight size={15} />
-                      </b>
-                    </button>
                   </div>
                   {!visible.length && (
-                    <p className="muted">
-                      Nenhum imóvel por aqui. Adicione uma opção ou ajuste os
-                      filtros.
-                    </p>
+                    <div className="collection-empty">
+                      <House size={24} />
+                      <h3>
+                        {properties.length
+                          ? "Nenhum imóvel encontrado"
+                          : "Nossa lista começa aqui"}
+                      </h3>
+                      <p>
+                        {properties.length
+                          ? "Tente outra busca ou limpe os filtros para ver todos os imóveis."
+                          : "Guarde o primeiro imóvel para começar a comparar com calma."}
+                      </p>
+                      {properties.length ? (
+                        <button
+                          className="secondary"
+                          onClick={() => {
+                            setFilter("Todos");
+                            setSearch("");
+                            setCityFilter("");
+                            setNeighborhoodFilter("");
+                            setMore(false);
+                          }}
+                        >
+                          Limpar busca e filtros
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary"
+                          onClick={() => open(newProperty(), true)}
+                        >
+                          <Plus size={16} /> Adicionar primeiro imóvel
+                        </button>
+                      )}
+                    </div>
                   )}
-                  <div className="bottom-note">
-                    <ShieldCheck size={17} />
-                    <p>
-                      Cada informação no seu tempo.{" "}
-                      <span>Comece com o que sabe e complete depois.</span>
-                    </p>
-                  </div>
                 </>
               )}
               {tab === "Comparar" && (
