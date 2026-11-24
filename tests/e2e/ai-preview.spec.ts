@@ -8,8 +8,11 @@ test.skip(
 test("prévia da IA organiza dados e abre cadastro preenchido", async ({
   page,
 }) => {
-  await page.route("**/api/import", (route) =>
-    route.fulfill({
+  await page.route("**/api/import", (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.url).toBe("https://example.com/imovel/123");
+    expect(body.text).toBe("");
+    return route.fulfill({
       json: {
         fields: {
           name: {
@@ -46,12 +49,12 @@ test("prévia da IA organiza dados e abre cadastro preenchido", async ({
           },
         },
       },
-    }),
-  );
+    });
+  });
   await page.goto("/");
   await page.getByRole("button", { name: "Importar anúncio com IA" }).click();
   await page
-    .getByLabel("Link do anúncio para guardar na ficha")
+    .getByLabel("Link do anúncio para ler e guardar")
     .fill("https://example.com/imovel/123");
   await page.evaluate(() => {
     const bytes = Uint8Array.from(
@@ -73,10 +76,7 @@ test("prévia da IA organiza dados e abre cadastro preenchido", async ({
     );
   });
   await expect(page.getByText("Foto pronta", { exact: true })).toBeVisible();
-  await page
-    .getByLabel("Texto da página do anúncio")
-    .fill("Residencial de teste com três quartos em Campinas, Cambuí.");
-  await page.getByRole("button", { name: "Autorizar e extrair texto" }).click();
+  await page.getByRole("button", { name: "Ler anúncio com IA" }).click();
   await expect(page.getByRole("heading", { name: "Onde fica" })).toBeVisible();
   await expect(page.getByLabel("Suítes", { exact: true })).toHaveValue("1");
   await expect(page.getByLabel("Destaques encontrados")).toContainText(

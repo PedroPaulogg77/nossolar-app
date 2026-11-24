@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { parseAiFieldsText, parseAiResponse } from "@/lib/ai-response";
+import { readListingPage } from "@/lib/listing-page";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const groqModel = "openai/gpt-oss-20b";
@@ -58,15 +59,36 @@ export async function POST(req: NextRequest) {
       chunks.push(value);
     }
     const body = z
-      .object({ text: z.string().min(10).max(50000), consent: z.literal(true) })
+      .object({
+        text: z.string().max(50000).optional(),
+        url: z.string().max(2000).optional(),
+        consent: z.literal(true),
+      })
       .parse(JSON.parse(Buffer.concat(chunks).toString()));
+    if (!body.text?.trim() && !body.url?.trim())
+      return fail("Informe o link ou cole o texto do anúncio.", 400);
+    let listingText = body.text?.trim() ?? "";
+    if (!listingText && body.url) {
+      try {
+        listingText = await readListingPage(body.url);
+      } catch (error) {
+        return fail(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível ler o anúncio. Cole o texto abaixo.",
+          422,
+        );
+      }
+    }
+    if (listingText.length < 10)
+      return fail("O anúncio não contém texto suficiente para análise.", 400);
     const hash = createHash("sha256")
       .update(
         "v5|" +
           (useGroq
             ? `groq:${groqModel}`
             : `gemini:${process.env.GEMINI_MODEL}`) +
-          body.text,
+          listingText,
       )
       .digest("hex");
     const { data: reservation, error } = await db.rpc("reserve_ai_import", {
@@ -105,7 +127,7 @@ export async function POST(req: NextRequest) {
               model: groqModel,
               messages: [
                 { role: "system", content: detailedPrompt },
-                { role: "user", content: body.text },
+                { role: "user", content: listingText },
               ],
               response_format: { type: "json_object" },
               reasoning_effort: "low",
@@ -159,7 +181,7 @@ export async function POST(req: NextRequest) {
           },
         ],
       },
-      contents: [{ parts: [{ text: body.text }] }],
+      contents: [{ parts: [{ text: listingText }] }],
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0,

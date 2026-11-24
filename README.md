@@ -52,7 +52,7 @@ Antes de disponibilizar a conta, valide RLS: os dois membros compartilham dados;
 
 ## Gemini opcional
 
-Desativado por padrão. A integração atual extrai **texto colado** de anúncios, inclusive destaques qualitativos que podem ser revisados antes de salvar. O link do anúncio é guardado para consulta posterior e uma foto pode ser colada na mesma etapa. Links, PDF e imagem não são analisados pelo backend; somente o texto colado é enviado à IA.
+Desativado por padrão. A integração aceita um link HTTPS público ou **texto colado**. Para links, o servidor lê apenas o HTML público, limita tamanho, tempo, redirecionamentos e destinos de rede, e envia o texto encontrado à IA. Portais que exigem sessão, renderizam tudo por JavaScript ou bloqueiam robôs podem impedir a leitura; nesse caso, cole o texto do anúncio. O link fica guardado na ficha e uma foto pode ser colada na mesma etapa. PDF e imagem não são analisados pela IA.
 
 1. Use `gemini-3.5-flash-lite`. Em 24/11/2026, a [tabela oficial de preços](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite) indica entrada e saída de texto gratuitas no Free Tier, e a chave fornecida lista esse modelo com suporte a `generateContent`. Confirme que o projeto dessa chave está no Free Tier antes de ativar a integração; a lista de modelos não informa o plano de faturamento.
 2. Configure apenas no servidor `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_ENABLED=true` e `GEMINI_FREE_TIER_CONFIRMED=true` para a conta gratuita. Se o projeto for convertido em conta paga, configure `GEMINI_BILLING_MODE=paid`; os custos devem ser monitorados no AI Studio. Nunca coloque a chave em `NEXT_PUBLIC_`.

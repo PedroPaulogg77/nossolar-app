@@ -2064,7 +2064,7 @@ export default function Home({
         >
           <div className="dialog-body">
             <label className="field">
-              <span>Link do anúncio para guardar na ficha</span>
+              <span>Link do anúncio para ler e guardar</span>
               <input
                 type="url"
                 placeholder="https://..."
@@ -2112,19 +2112,19 @@ export default function Home({
             {!aiPreview && (
               <>
                 <p className="hint">
-                  Pode copiar a página inteira do anúncio. A IA tentará ignorar
-                  menus, anúncios e textos de outros imóveis. Ao extrair, você
-                  autoriza o envio deste texto ao {aiProvider}.{" "}
+                  Cole o link e a IA tentará ler a página pública. Se o portal
+                  bloquear, cole o texto da página abaixo. Ao extrair, você
+                  autoriza o envio do texto encontrado ao {aiProvider}.{" "}
                   {aiProvider === "Gemini"
                     ? "No Free Tier, o provedor pode usar os dados para melhorar seus produtos."
                     : "O Groq não retém solicitações de inferência por padrão; consulte os controles de dados da sua conta."}
-                  Revise todos os campos antes de salvar. O link será guardado
-                  na ficha, sem leitura automática; cole o texto do anúncio para
-                  a análise.
+                  Revise todos os campos antes de salvar. O link também ficará
+                  guardado na ficha.
                 </p>
                 <label className="field">
                   <span>
-                    Texto da página do anúncio (até 50.000 caracteres)
+                    Texto da página do anúncio, se preferir colar (até 50.000
+                    caracteres)
                   </span>
                   <textarea
                     maxLength={50000}
@@ -2134,7 +2134,7 @@ export default function Home({
                 </label>
                 <button
                   className="secondary"
-                  disabled={busy || !aiText.trim()}
+                  disabled={busy || (!aiText.trim() && !aiUrl.trim())}
                   onClick={async () => {
                     setBusy(true);
                     try {
@@ -2145,7 +2145,11 @@ export default function Home({
                           "Content-Type": "application/json",
                           Authorization: `Bearer ${session?.data.session?.access_token ?? ""}`,
                         },
-                        body: JSON.stringify({ text: aiText, consent: true }),
+                        body: JSON.stringify({
+                          text: aiText,
+                          url: aiUrl.trim(),
+                          consent: true,
+                        }),
                       });
                       const result = await response.json();
                       if (!response.ok) throw Error(result.error);
@@ -2161,7 +2165,7 @@ export default function Home({
                     }
                   }}
                 >
-                  Autorizar e extrair texto
+                  {busy ? "Lendo anúncio..." : "Ler anúncio com IA"}
                 </button>
               </>
             )}
