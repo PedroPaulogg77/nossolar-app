@@ -113,8 +113,8 @@ export async function POST(req: NextRequest) {
       );
     const models =
       model === "gemini-3.1-flash-lite"
-        ? [model, model, model]
-        : [model, "gemini-3.1-flash-lite", "gemini-3.1-flash-lite"];
+        ? [model, model, "gemini-3.8-flash"]
+        : [model, "gemini-3.1-flash-lite", "gemini-3.8-flash"];
     let lastIssue = "EMPTY";
     for (const [index, selectedModel] of models.entries()) {
       if (deadline - Date.now() < 2000) {
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
           );
         if (response.status === 404)
           return fail(
-            "O modelo Gemini configurado não está disponível para esta chave.",
+            `O modelo ${selectedModel} não está disponível para esta chave.`,
             502,
           );
         if (response.status === 400)
