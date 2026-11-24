@@ -117,11 +117,19 @@ export async function POST(req: NextRequest) {
         "O limite gratuito foi atingido. Continue cadastrando manualmente.",
         429,
       );
-    if (!response.ok)
-      return fail(
-        "Não foi possível extrair. Continue cadastrando manualmente.",
-        502,
-      );
+    if (!response.ok) {
+      const reason =
+        response.status === 400
+          ? "O Gemini recusou o texto enviado. Cole apenas a descrição do anúncio."
+          : response.status === 401 || response.status === 403
+            ? "A chave Gemini não foi aceita para este projeto. Confira se a chave é do projeto gratuito."
+            : response.status === 404
+              ? "O modelo Gemini configurado não está disponível para esta chave."
+              : response.status >= 500
+                ? "O Gemini está indisponível no momento. Tente novamente mais tarde."
+                : `O Gemini recusou a extração (código ${response.status}).`;
+      return fail(reason, 502);
+    }
     const result = await response.json();
     const fields = schema.parse(
       JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}"),
