@@ -1962,15 +1962,16 @@ export default function Home({ aiEnabled }: { aiEnabled: boolean }) {
         >
           <div className="dialog-body">
             <p className="hint">
-              Ao extrair, você autoriza o envio deste texto ao Gemini. No Free
+              Pode copiar a página inteira do anúncio. A IA tentará ignorar menus,
+              anúncios e textos de outros imóveis. Ao extrair, você autoriza o envio deste texto ao Gemini. No Free
               Tier, o provedor pode usar os dados para melhorar seus produtos.
               Revise todos os campos antes de salvar. Leitura direta de links e
               arquivos indisponível nesta versão; cole o texto do anúncio.
             </p>
             <label className="field">
-              <span>Texto do anúncio (até 12.000 caracteres)</span>
+              <span>Texto da página do anúncio (até 50.000 caracteres)</span>
               <textarea
-                maxLength={12000}
+                maxLength={50000}
                 value={aiText}
                 onChange={(e) => setAiText(e.target.value)}
               />

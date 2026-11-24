@@ -25,15 +25,17 @@ export function PrivateAccess({ children }: { children: React.ReactNode }) {
       );
       return;
     }
-    async function check() {
+    async function check(preserveOnError = false) {
       const { data, error } = await supabase!.auth.getUser();
       if (!active) return;
+      if (error && preserveOnError) return;
       if (error || !data.user) {
         setAccess("login");
         return;
       }
       const { data: household, error: denied } =
         await supabase!.rpc("ensure_household");
+      if (denied && preserveOnError) return;
       if (active) {
         setAccess(!denied && household ? "allowed" : "denied");
         if (denied)
@@ -48,15 +50,13 @@ export function PrivateAccess({ children }: { children: React.ReactNode }) {
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      setAccess("loading");
-      setTimeout(
-        () =>
-          void check().catch(() => {
-            if (active) setAccess("login");
-          }),
-        0,
-      );
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setAccess("login");
+        return;
+      }
+      if (event !== "SIGNED_IN") return;
+      setTimeout(() => void check(true).catch(() => {}), 0);
     });
     return () => {
       active = false;
