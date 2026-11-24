@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
         maxOutputTokens: 2500,
       },
     });
+    const deadline = Date.now() + 55000;
     const generate = (selectedModel: string) =>
       fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`,
@@ -104,16 +105,24 @@ export async function POST(req: NextRequest) {
             "Content-Type": "application/json",
             "x-goog-api-key": process.env.GEMINI_API_KEY!,
           },
-          signal: AbortSignal.timeout(25000),
+          signal: AbortSignal.timeout(
+            Math.min(20000, Math.max(1000, deadline - Date.now())),
+          ),
           body: requestBody,
         },
       );
     const models =
       model === "gemini-3.1-flash-lite"
-        ? [model]
-        : [model, "gemini-3.1-flash-lite"];
+        ? [model, model, model]
+        : [model, "gemini-3.1-flash-lite", "gemini-3.1-flash-lite"];
     let lastIssue = "EMPTY";
     for (const [index, selectedModel] of models.entries()) {
+      if (deadline - Date.now() < 2000) {
+        lastIssue = "TIMEOUT";
+        break;
+      }
+      if (index === 2)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       let response: Response;
       try {
         response = await generate(selectedModel);
@@ -129,6 +138,11 @@ export async function POST(req: NextRequest) {
         );
       if (!response.ok) {
         lastIssue = `HTTP_${response.status}`;
+        console.warn("Gemini model request failed", {
+          model: selectedModel,
+          status: response.status,
+          attempt: index + 1,
+        });
         if (response.status >= 500 && index < models.length - 1) continue;
         if (response.status === 401 || response.status === 403)
           return fail(
@@ -171,7 +185,7 @@ export async function POST(req: NextRequest) {
         : lastIssue === "MAX_TOKENS"
           ? "O anúncio gerou uma resposta longa demais. Tente com menos texto."
           : lastIssue.startsWith("HTTP_5")
-            ? "O Gemini não respondeu agora. Aguarde alguns minutos e tente novamente."
+            ? `O Google respondeu com erro ${lastIssue.slice(5)} mesmo após novas tentativas. Aguarde alguns minutos e tente novamente.`
             : "O Gemini respondeu sem dados aproveitáveis. Tente novamente com menos texto.",
       502,
     );
