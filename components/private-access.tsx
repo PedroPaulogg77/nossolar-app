@@ -20,7 +20,9 @@ export function PrivateAccess({ children }: { children: React.ReactNode }) {
     }
     if (!supabase) {
       setAccess("denied");
-      setMessage("Nosso espaço ainda está sendo preparado.");
+      setMessage(
+        "O acesso por e-mail ainda não está ativo neste endereço. Estamos terminando a conexão da conta.",
+      );
       return;
     }
     async function check() {
@@ -73,6 +75,10 @@ export function PrivateAccess({ children }: { children: React.ReactNode }) {
         <p>Entre para continuar de onde paramos.</p>
         {access === "loading" ? (
           <p role="status">Abrindo nosso espaço…</p>
+        ) : !supabase ? (
+          <p className="entry-message" role="status">
+            {message}
+          </p>
         ) : (
           <form
             onSubmit={async (e) => {
@@ -110,13 +116,13 @@ export function PrivateAccess({ children }: { children: React.ReactNode }) {
                 autoComplete="email"
               />
             </label>
-            <button className="primary" disabled={busy || !supabase}>
+            <button className="primary" disabled={busy}>
               {busy ? "Enviando…" : "Receber meu acesso"}
               <ArrowRight size={17} />
             </button>
           </form>
         )}
-        {message && (
+        {message && supabase && (
           <p className="entry-message" role="status">
             {message}
           </p>
