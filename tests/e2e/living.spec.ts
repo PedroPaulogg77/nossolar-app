@@ -23,6 +23,7 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   await page.getByLabel("Nome do item", { exact: true }).fill("Sofá");
   await page.getByLabel("Quantidade", { exact: true }).fill("2");
   await page.getByLabel("Estimativa por unidade").fill("90");
+  await page.getByText("Fotos e detalhes").click();
   await page.locator('input[type="file"]').first().setInputFiles(photo);
   await expect(
     page.getByRole("img", { name: "Foto de sala.jpg" }),
@@ -41,22 +42,29 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
       .fill(`https://example.com/produto-${index}`);
   }
   await page.getByRole("radio", { name: "Escolher esta opção" }).nth(1).check();
-  await page.getByText("Pagamento e parcelas (opcional)").click();
-  await page.getByLabel("Forma de pagamento").selectOption("Parcelado");
+  await page.getByLabel("Pagamento", { exact: false }).first().selectOption("Parcelado");
   await page.getByLabel("Número de parcelas").fill("3");
-  await page.getByLabel("Primeiro mês de cobrança").fill("2026-12");
+  await page.getByLabel("Mês da compra").fill("2026-12");
   await page.getByRole("button", { name: "Salvar item", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator(".living-card").getByText("R$ 300,00", { exact: true })).toBeVisible();
+  await expect(page.locator(".shopping-price")).toContainText("R$ 300,00");
   await page.reload();
   await page.getByRole("button", { name: "Mobília", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Sofá", exact: true }),
+    page.locator(".shopping-row").getByText("Sofá", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("combobox", {name:"Opção de Sofá"}).selectOption({label:"Modelo 1 · R$ 100,00"});
+  await expect(page.locator(".shopping-price")).toContainText("R$ 200,00");
+  await page.getByRole("combobox", {name:"Opção de Sofá"}).selectOption({label:"Modelo 2 · R$ 150,00"});
+  await expect(page.locator(".shopping-price")).toContainText("R$ 300,00");
   await page.screenshot({
     path: "test-results/living-desktop.png",
     fullPage: true,
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({path:"test-results/living-mobile.png",fullPage:true});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1080 });
   await page.getByRole("button", { name: "Inspirações", exact: true }).click();
   await page.getByRole("button", { name: "Nova coleção" }).click();
   await page.getByLabel("Nome da coleção").fill("Sala");

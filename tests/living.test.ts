@@ -64,6 +64,13 @@ describe("orçamento da casa", () => {
       10000,
     );
   });
+  it("separa simulação e compra e usa parcelas da opção escolhida", () => {
+    const selected = crypto.randomUUID();
+    const item = {...newPurchase(), name:"Geladeira", estimate:3000, firstMonth:"2027-12", options:[{id:selected,name:"Compacta",store:"",url:"",price:2400,photos:[],payment:"Parcelado" as const,installments:12,firstMonth:"2027-12"}],selected};
+    expect(purchasesFlow([item],"2027-12",2,"planned").months.map(m=>m.total)).toEqual([200,200]);
+    expect(purchasesFlow([item],"2027-12",2,"bought").months[0].total).toBe(0);
+    expect(purchasesFlow([{...item,purchased:true}],"2027-12",2,"bought").months[0].total).toBe(200);
+  });
   it("rejeita vínculo inexistente e link inválido", () => {
     const item = {
       ...newPurchase(),

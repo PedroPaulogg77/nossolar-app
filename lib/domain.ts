@@ -318,7 +318,7 @@ export function monthIndex(s: string) {
   const [y, m] = s.split("-").map(Number);
   return y * 12 + m - 1;
 }
-export function cashflow(p: Property, start: string) {
+export function cashflow(p: Property, start: string, count = 12) {
   const f = p.finance,
     e = entry(p),
     doc = documentation(p);
@@ -343,7 +343,7 @@ export function cashflow(p: Property, start: string) {
     pending.push("Evolução de obra");
   return {
     pending,
-    months: Array.from({ length: 12 }, (_, i) => {
+    months: Array.from({ length: count }, (_, i) => {
       const index = monthIndex(start) + i;
       const date = new Date(Math.floor(index / 12), index % 12, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

@@ -48,6 +48,7 @@ it("migrações: casal compartilha espaço; terceiros e anônimos não acessam d
         "utf8",
       ),
     );
+    await db.exec(await readFile(new URL("../supabase/005_living_planning.sql", import.meta.url), "utf8"));
     await db.exec("set role authenticated");
     const first = await db.query<{ id: string }>(
       "select public.ensure_household() id",

@@ -29,7 +29,7 @@ import {
   useLiving,
   discardLivingPhotos,
 } from "@/lib/living-store";
-import { money } from "@/lib/domain";
+import { money, cashflow, type Property } from "@/lib/domain";
 import type { Attachment } from "@/lib/attachment-types";
 type Store = ReturnType<typeof useLiving>;
 const number = (s: string) => (s === "" ? null : Number(s));
@@ -133,106 +133,56 @@ function Photos({
   );
 }
 function Budget({
-  items,
-  reserve,
-  onReserve,
+  data,
+  property,
+  mode,
+  onChange,
   saving,
 }: {
-  items: Purchase[];
-  reserve: number | null;
-  onReserve: (value: number | null) => void;
+  data: Living;
+  property?: Property;
+  mode: "Simulação" | "Comprado";
+  onChange: (patch: Partial<Living>) => void;
   saving: boolean;
 }) {
-  const [reserveDraft, setReserveDraft] = useState<string>(
-    String(reserve ?? ""),
-  );
-  const b = budget(items),
-    [start, setStart] = useState(
-      new Date().toLocaleDateString("sv-SE").slice(0, 7),
-    );
-  const flow = purchasesFlow(items, start);
-  const cards = [
-    ["Para a mudança", b.planned],
-    ["Já comprado", b.bought],
-    ["Falta comprar", b.remaining],
-    ["Planejado para depois", b.future],
-    ["Pagamentos à vista", b.upfront],
-  ] as const;
+  const [start, setStart] = useState(new Date().toLocaleDateString("sv-SE").slice(0, 7));
+  const [limitDraft, setLimitDraft] = useState(String(data.monthlyLimit ?? ""));
+  const monthCount = Math.max(12, Math.min(36, (Number(data.moveMonth.slice(0,4)) - Number(start.slice(0,4))) * 12 + Number(data.moveMonth.slice(5)) - Number(start.slice(5)) + 4));
+  const plan = purchasesFlow(data.items, start, monthCount, "planned");
+  const bought = purchasesFlow(data.items, start, monthCount, "bought");
+  const home = property ? cashflow(property, start, monthCount) : null;
+  const b = budget(data.items);
   return (
-    <details className="living-budget">
-      <summary>
-        Orçamento das compras · {money(b.planned.known)}
-        {b.planned.pending ? ` + ${b.planned.pending} sem preço` : ""}
-      </summary>
-      <div className="living-totals">
-        {cards.map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{money(value.known)}</strong>
-            {value.pending > 0 && (
-              <small>{value.pending} com preço pendente</small>
-            )}
-          </div>
-        ))}
-      </div>
-      <p className="hint">
-        Desejos, itens que já temos e itens marcados “Não comprar” ficam fora
-        destes valores. “Depois” é uma previsão separada, não um saldo bancário
-        reservado.
-      </p>
-      <div className="living-reserve">
-        <Input
-          label="Dinheiro reservado para compras futuras (R$)"
-          type="number"
-          value={reserveDraft}
-          onChange={setReserveDraft}
-        />
-        <button
-          className="secondary"
-          disabled={saving}
-          onClick={() => onReserve(number(reserveDraft))}
-        >
-          Salvar reserva
-        </button>
-        <small>
-          Reserva informada: {money(reserve)}. Separada do orçamento imediato.
-        </small>
-      </div>
-      <Input
-        label="Compras nos próximos 12 meses a partir de"
-        type="month"
-        value={start}
-        onChange={(v) => {
-          if (v) setStart(v);
-        }}
-      />
-      <div className="living-months">
-        {flow.months.map((m) => (
-          <div key={m.key}>
-            <span>
-              {m.key.slice(5)}/{m.key.slice(0, 4)}
-            </span>
-            <strong>{money(m.total)}</strong>
-          </div>
-        ))}
-      </div>
-      {flow.pending.length > 0 && (
-        <p className="hint">
-          Faltam preço ou mês de cobrança para: {flow.pending.join(", ")}. O
-          cronograma mostra apenas pagamentos informados.
-        </p>
-      )}
-    </details>
+    <section className="planning">
+      <div className="planning-heading"><h2>Quanto vamos pagar por mês?</h2><label className="field"><span>Mudança prevista</span><input type="month" value={data.moveMonth} disabled={saving} onChange={e => onChange({moveMonth:e.target.value})}/></label></div>
+      <div className="planning-summary"><span>Imóvel: {property?.name || "a escolher"}</span><span>A comprar: {money(b.remaining.known)}</span><span>Já comprado: {money(b.bought.known)}</span></div>
+      <div className="planning-settings"><label className="field"><span>Ver a partir de</span><input type="month" value={start} onChange={e => setStart(e.target.value)}/></label><label className="living-check"><input type="checkbox" checked={data.limitEnabled} disabled={saving} onChange={e => onChange({limitEnabled:e.target.checked})}/> Usar limite mensal</label>{data.limitEnabled && <label className="field"><span>Limite por mês (R$)</span><input type="number" min="0" value={limitDraft} onChange={e => setLimitDraft(e.target.value)} onBlur={() => { if (number(limitDraft) !== data.monthlyLimit) onChange({monthlyLimit:number(limitDraft)}); }}/></label>}</div>
+      <div className="planning-bars">{plan.months.map((m,i) => {
+        const housing=home?.months[i]?.total ?? 0;
+        const committed=bought.months[i].total;
+        const simulated=mode === "Simulação" ? m.total : 0;
+        const total=housing+committed+simulated;
+        const max=Math.max(1,...plan.months.map((x,j)=>(home?.months[j]?.total ?? 0)+bought.months[j].total+(mode === "Simulação" ? x.total : 0)));
+        return <div className={m.key === data.moveMonth ? "planning-bar moving" : "planning-bar"} key={m.key} title={`Imóvel ${money(housing)} · Comprado ${money(committed)} · Planejado ${money(simulated)}`}>
+          <strong>{money(total)}</strong><div className="planning-bar-track"><div className="bar-plan" style={{height:`${simulated/max*100}%`}}/><div className="bar-bought" style={{height:`${committed/max*100}%`}}/><div className="bar-home" style={{height:`${housing/max*100}%`}}/></div><span>{m.key.slice(5)}/{m.key.slice(2,4)}</span>{m.key === data.moveMonth && <small>Mudança</small>}{data.limitEnabled && data.monthlyLimit !== null && total > data.monthlyLimit && <small className="over-limit">Acima do limite</small>}
+        </div>;
+      })}</div>
+      <div className="planning-legend"><span>■ Imóvel</span><span>■ Comprado</span>{mode === "Simulação" && <span>■ Planejado</span>}</div>
+      {[...plan.pending,...bought.pending,...(home?.pending ?? [])].length > 0 && <p className="hint">Sem preço ou mês definido: {[...new Set([...plan.pending,...bought.pending,...(home?.pending ?? [])])].join(", ")}.</p>}
+    </section>
   );
 }
 export function LivingPanel({
   area,
   store,
+  property,
 }: {
   area: "Mobília" | "Inspirações";
   store: Store;
+  property?: Property;
 }) {
   const { data, loading, error, saving, save, reload } = store;
+  const [mode, setMode] = useState<"Simulação" | "Comprado">("Simulação");
   const [view, setView] = useState<string>("Para a mudança"),
     [group, setGroup] = useState(""),
     [room, setRoom] = useState(""),
@@ -266,6 +216,7 @@ export function LivingPanel({
   const visible = data.items.filter(
     (i) =>
       (view === "Todos" || i.priority === view) &&
+      (mode === "Simulação" ? !i.purchased : i.purchased) &&
       (!group || i.group === group) &&
       (!room || i.room === room) &&
       i.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
@@ -277,17 +228,12 @@ export function LivingPanel({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">NOSSA CASA, DO NOSSO JEITO</span>
+          <span className="eyebrow">NOSSO PLANEJAMENTO</span>
           <h1>
             {area === "Mobília"
-              ? "O que vai fazer parte do lar"
+              ? "Compras da casa"
               : "Ideias para o nosso lar"}
           </h1>
-          <p>
-            {area === "Mobília"
-              ? "Uma lista para escolher com calma e comprar no nosso tempo."
-              : "Referências que queremos guardar, por ambiente."}
-          </p>
         </div>
         <button
           className="primary"
@@ -298,6 +244,7 @@ export function LivingPanel({
               setItem({
                 ...newPurchase(),
                 priority: view === "Desejo" ? "Desejo" : "Para a mudança",
+                firstMonth: data.moveMonth,
               });
             else if (!data.collections.length)
               setEditingCollection({ id: crypto.randomUUID(), name: "" });
@@ -318,17 +265,12 @@ export function LivingPanel({
         </button>
       </div>
       <div className="living-sync">
-        <span>
-          {saving
-            ? "Salvando…"
-            : "As alterações são guardadas ao salvar cada ficha."}
-        </span>
         <button
           className="text-button"
           disabled={loading || saving}
           onClick={() => void reload()}
         >
-          <RefreshCw size={14} /> Atualizar lista
+          <RefreshCw size={14} /> Atualizar
         </button>
       </div>
       {message && !item && !reference && !editingCollection && (
@@ -347,23 +289,28 @@ export function LivingPanel({
         </div>
       ) : area === "Mobília" ? (
         <>
+          <div className="planning-modes" role="tablist" aria-label="Compras">
+            {(["Simulação", "Comprado"] as const).map(v => <button role="tab" aria-selected={mode === v} className={mode === v ? "active" : ""} key={v} onClick={() => setMode(v)}>{v}</button>)}
+          </div>
+          <Budget data={data} property={property} mode={mode} saving={saving} onChange={patch => void run({...data,...patch})}/>
+          <h2 className="living-section-title">{mode === "Simulação" ? "O que queremos comprar" : "O que já compramos"}</h2>
           <div
             className="living-tabs"
             role="group"
             aria-label="Organização das compras"
           >
-            {[...priorities, "Todos"].map((v) => (
+            {["Para a mudança", "Depois", "Desejo", "Já temos", "Todos"].map((v) => (
               <button
                 key={v}
                 className={view === v ? "chip selected" : "chip"}
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
               >
-                {v === "Desejo" ? "Desejos" : v}
+                {v === "Desejo" ? "Desejos" : v === "Para a mudança" ? "Até a mudança" : v}
               </button>
             ))}
           </div>
-          <div className="living-filters">
+          <details className="living-extra-filters"><summary>Buscar e filtrar</summary><div className="living-filters">
             <Input label="Buscar item" value={search} onChange={setSearch} />
             <label className="field">
               <span>Grupo</span>
@@ -383,18 +330,7 @@ export function LivingPanel({
                 ))}
               </select>
             </label>
-          </div>
-          {view !== "Desejo" && (
-            <Budget
-              key={`budget-${data.revision}`}
-              items={data.items}
-              reserve={data.futureReserve}
-              saving={saving}
-              onReserve={(futureReserve) =>
-                void run({ ...data, futureReserve })
-              }
-            />
-          )}
+          </div></details>
           {!visible.length ? (
             <div className="collection-empty">
               <Sofa />
@@ -421,50 +357,17 @@ export function LivingPanel({
               )}
             </div>
           ) : (
-            <div className="living-grid">
-              {visible.map((i) => {
-                const option = i.options.find((o) => o.id === i.selected);
-                return (
-                  <button
-                    className="living-card"
-                    key={i.id}
-                    onClick={() => {
-                      setMessage("");
-                      setItem(structuredClone(i));
-                    }}
-                  >
-                    <div className="living-cover">
-                      <AttachmentCover
-                        file={option?.photos[0] || i.photos[0]}
-                        name={i.name}
-                        fallback={
-                          i.priority === "Desejo" ? (
-                            <Heart size={32} />
-                          ) : (
-                            <Sofa size={32} />
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="living-card-body">
-                      <small>
-                        {i.room || i.group} {i.purchased ? "· Comprado" : ""}
-                      </small>
-                      <h3>{i.name}</h3>
-                      <strong>
-                        {itemTotal(i) === null
-                          ? "Preço pendente"
-                          : money(itemTotal(i))}
-                      </strong>
-                      <p>
-                        {i.quantity} {i.quantity === 1 ? "unidade" : "unidades"}{" "}
-                        · {option ? option.name : "Estimativa manual"}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="shopping-list">{visible.map(i => {
+              const option=i.options.find(o=>o.id===i.selected);
+              return <div className="shopping-row" key={i.id}>
+                <div className="shopping-thumb"><AttachmentCover file={option?.photos[0] || i.photos[0]} name={i.name} fallback={<Sofa size={20}/>} /></div>
+                <div className="shopping-name"><strong>{i.name}</strong><small>{i.quantity} {i.quantity === 1 ? "unidade" : "unidades"} · {i.room || i.group}</small></div>
+                <label className="shopping-choice"><span>Opção</span><select aria-label={`Opção de ${i.name}`} value={i.selected ?? ""} disabled={saving} onChange={e => void run({...data,items:data.items.map(x=>x.id===i.id ? {...x,selected:e.target.value || null}:x)})}><option value="">Estimativa</option>{i.options.map(o=><option key={o.id} value={o.id}>{o.name} · {o.price === null ? "sem preço" : money(o.price)}</option>)}</select></label>
+                <label className="shopping-when"><span>Comprar em</span><input aria-label={`Mês de compra de ${i.name}`} type="month" value={option?.firstMonth || i.firstMonth} disabled={saving} onChange={e => void run({...data,items:data.items.map(x=>x.id===i.id ? {...x,firstMonth:e.target.value,options:x.options.map(o=>o.id===x.selected ? {...o,firstMonth:e.target.value}:o)}:x)})}/></label>
+                <div className="shopping-price">{itemTotal(i) === null ? "Sem preço" : money(itemTotal(i))}<small>{(option?.payment || i.payment) === "Parcelado" ? `${option?.installments || i.installments}x` : "À vista"}</small></div>
+                <button className="shopping-edit" onClick={()=>{setMessage("");setItem(structuredClone(i));}}>Editar</button>
+              </div>;
+            })}</div>
           )}
         </>
       ) : (
@@ -557,7 +460,7 @@ export function LivingPanel({
       {item && (
         <Modal
           title={item.name || "Um novo item"}
-          description="Guarde as opções e escolha a que entra no planejamento."
+          description="Escolha quando comprar e compare as opções."
           onClose={() => close(() => setItem(null))}
         >
           <form
@@ -639,6 +542,11 @@ export function LivingPanel({
                   onChange={(v) => setItem({ ...item, estimate: number(v) })}
                 />
               </div>
+              <div className="form-grid">
+                <Input label="Mês da compra" type="month" value={item.firstMonth} onChange={firstMonth => setItem({...item,firstMonth})}/>
+                <label className="field"><span>Pagamento</span><select value={item.payment} onChange={e => setItem({...item,payment:e.target.value as Purchase["payment"]})}><option>À vista</option><option>Parcelado</option></select></label>
+                {item.payment === "Parcelado" && <Input label="Número de parcelas" type="number" value={item.installments} onChange={v => setItem({...item,installments:Number(v)})}/>}
+              </div>
               <label className="living-check">
                 <input
                   type="checkbox"
@@ -649,15 +557,13 @@ export function LivingPanel({
                 />{" "}
                 Já compramos este item
               </label>
-              <Photos
+              <details className="living-more"><summary>Fotos e detalhes</summary><Photos
                 files={item.photos}
                 onChange={(photos) => setItem({ ...item, photos })}
                 {...photoProps}
-              />
+              /></details>
               <h3>Opções de compra</h3>
-              <p className="hint">
-                Preços por unidade. Só a opção escolhida entra nas contas.
-              </p>
+              <p className="hint">Selecione uma opção para testar o impacto no mês.</p>
               <label className="living-check">
                 <input
                   type="radio"
@@ -712,6 +618,7 @@ export function LivingPanel({
                         onChange={(url) => update({ url })}
                       />
                     </div>
+                    <div className="form-grid"><Input label={`Mês da opção ${index + 1}`} type="month" value={o.firstMonth ?? item.firstMonth} onChange={firstMonth => update({firstMonth})}/><label className="field"><span>Pagamento da opção {index + 1}</span><select value={o.payment ?? item.payment} onChange={e => update({payment:e.target.value as Purchase["payment"]})}><option>À vista</option><option>Parcelado</option></select></label>{(o.payment ?? item.payment) === "Parcelado" && <Input label={`Parcelas da opção ${index + 1}`} type="number" value={o.installments ?? item.installments} onChange={v => update({installments:Number(v)})}/>}</div>
                     {o.url && /^https?:\/\//i.test(o.url) && (
                       <a
                         className="text-button"
@@ -722,11 +629,11 @@ export function LivingPanel({
                         Abrir produto <ExternalLink size={14} />
                       </a>
                     )}
-                    <Photos
+                    <details className="living-more"><summary>Fotos desta opção</summary><Photos
                       files={o.photos}
                       onChange={(photos) => update({ photos })}
                       {...photoProps}
-                    />
+                    /></details>
                     <button
                       type="button"
                       className="text-button"
@@ -766,49 +673,13 @@ export function LivingPanel({
               >
                 <Plus size={16} /> Adicionar opção
               </button>
-              <label className="field">
+              <details className="living-more"><summary>Observações</summary><label className="field">
                 <span>Observações do item</span>
                 <textarea
                   value={item.notes}
                   onChange={(e) => setItem({ ...item, notes: e.target.value })}
                 />
-              </label>
-              <details>
-                <summary>Pagamento e parcelas (opcional)</summary>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Forma de pagamento</span>
-                    <select
-                      value={item.payment}
-                      onChange={(e) =>
-                        setItem({
-                          ...item,
-                          payment: e.target.value as Purchase["payment"],
-                        })
-                      }
-                    >
-                      <option>À vista</option>
-                      <option>Parcelado</option>
-                    </select>
-                  </label>
-                  {item.payment === "Parcelado" && (
-                    <Input
-                      label="Número de parcelas"
-                      type="number"
-                      value={item.installments}
-                      onChange={(v) =>
-                        setItem({ ...item, installments: Number(v) })
-                      }
-                    />
-                  )}
-                  <Input
-                    label="Primeiro mês de cobrança"
-                    type="month"
-                    value={item.firstMonth}
-                    onChange={(firstMonth) => setItem({ ...item, firstMonth })}
-                  />
-                </div>
-              </details>
+              </label></details>
               <p>
                 Total considerado:{" "}
                 <strong>

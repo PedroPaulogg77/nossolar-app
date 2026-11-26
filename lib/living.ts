@@ -44,6 +44,9 @@ export const optionSchema = z.object({
   url: linkSchema,
   price,
   photos,
+  payment: z.enum(["À vista", "Parcelado"]).optional(),
+  installments: z.number().int().min(1).max(120).optional(),
+  firstMonth: z.string().regex(/^$|^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 });
 export const itemSchema = z
   .object({
@@ -86,6 +89,9 @@ export const livingSchema = z
   .object({
     revision: z.number().int().nonnegative(),
     futureReserve: price.default(null),
+    moveMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).default("2027-12"),
+    limitEnabled: z.boolean().default(false),
+    monthlyLimit: price.default(null),
     items: z.array(itemSchema).max(500),
     collections: z.array(collectionSchema).max(100),
     inspirations: z.array(inspirationSchema).max(1000),
@@ -117,6 +123,9 @@ export type Inspiration = z.infer<typeof inspirationSchema>;
 export const emptyLiving = (): Living => ({
   revision: 0,
   futureReserve: null,
+  moveMonth: "2027-12",
+  limitEnabled: false,
+  monthlyLimit: null,
   items: [],
   collections: [],
   inspirations: [],
@@ -158,28 +167,31 @@ export function budget(items: Purchase[]) {
     upfront: summarize(immediate.filter((i) => i.payment === "À vista")),
   };
 }
-export function purchasesFlow(items: Purchase[], start: string) {
+export function purchasesFlow(items: Purchase[], start: string, count = 12, mode: "all" | "planned" | "bought" = "all") {
   const planned = items.filter((i) => i.priority === "Para a mudança");
+  const included = planned.filter(i => mode === "all" || (mode === "bought" ? i.purchased : !i.purchased));
   const index = (date: string) =>
     Number(date.slice(0, 4)) * 12 + Number(date.slice(5)) - 1;
   const startIndex = index(start);
   return {
-    pending: planned
-      .filter((i) => itemTotal(i) === null || !i.firstMonth)
+    pending: included
+      .filter((i) => itemTotal(i) === null || !(i.options.find(o => o.id === i.selected)?.firstMonth || i.firstMonth))
       .map((i) => i.name),
-    months: Array.from({ length: 12 }, (_, offset) => {
+    months: Array.from({ length: count }, (_, offset) => {
       const n = startIndex + offset;
       const key = `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, "0")}`;
       let cents = 0;
-      for (const item of planned) {
+      for (const item of included) {
         const total = itemTotal(item);
-        if (total === null || !item.firstMonth) continue;
-        const count = item.payment === "Parcelado" ? item.installments : 1;
-        const delta = n - index(item.firstMonth);
-        if (delta >= 0 && delta < count) {
+        const option = item.options.find(o => o.id === item.selected);
+        const firstMonth = option?.firstMonth || item.firstMonth;
+        if (total === null || !firstMonth) continue;
+        const payments = (option?.payment || item.payment) === "Parcelado" ? (option?.installments || item.installments) : 1;
+        const delta = n - index(firstMonth);
+        if (delta >= 0 && delta < payments) {
           const totalCents = Math.round(total * 100),
-            base = Math.floor(totalCents / count);
-          cents += base + (delta < totalCents % count ? 1 : 0);
+            base = Math.floor(totalCents / payments);
+          cents += base + (delta < totalCents % payments ? 1 : 0);
         }
       }
       return { key, total: cents / 100 };
