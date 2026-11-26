@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import { it, expect } from "vitest";
 import { initialProperty, defaults } from "../lib/domain";
+import { emptyLiving, newPurchase, livingSchema } from "../lib/living";
 it("migrações: casal compartilha espaço; terceiros e anônimos não acessam dados nem anexos", async () => {
   const db = new PGlite();
   try {
@@ -40,10 +41,33 @@ it("migrações: casal compartilha espaço; terceiros e anônimos não acessam d
     await db.exec(
       `insert into private.allowed_members values('one@example.test'),('two@example.test');set role authenticated;set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';`,
     );
+    await db.exec("reset role");
+    await db.exec(
+      await readFile(
+        new URL("../supabase/004_living.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await db.exec("set role authenticated");
     const first = await db.query<{ id: string }>(
       "select public.ensure_household() id",
     );
     const hid = first.rows[0].id;
+    const purchase = { ...newPurchase(), name: "Sofá de teste" };
+    const optionId = crypto.randomUUID();
+    const collectionId = crypto.randomUUID();
+    const photo = { id: crypto.randomUUID(), name: "sala.jpg", mime: "image/jpeg", size: 1200, category: "Foto", createdAt: new Date().toISOString(), remotePath: `${hid}/living/photo` };
+    const living = livingSchema.parse({ ...emptyLiving(), futureReserve: 1500, items: [{ ...purchase, selected: optionId, options: [{ id: optionId, name: "Modelo escolhido", store: "Loja", url: "https://example.com/item", price: 250, photos: [photo] }] }], collections: [{ id: collectionId, name: "Sala" }], inspirations: [{ id: crypto.randomUUID(), collectionId, itemId: purchase.id, title: "Referência", url: "https://example.com/sala", notes: "", photos: [] }] });
+    await db.query("select public.save_living($1::jsonb,0)", [
+      JSON.stringify(living),
+    ]);
+    const roundtrip = await db.query<{ data: unknown }>("select public.load_living() data");
+    expect(livingSchema.parse(roundtrip.rows[0].data)).toEqual({ ...living, revision: 1 });
+    await expect(
+      db.query("select public.save_living($1::jsonb,0)", [
+        JSON.stringify(living),
+      ]),
+    ).rejects.toThrow("CONFLICT");
     for (let i = 0; i < 10; i++)
       await db.query("select public.reserve_ai_import($1) result", [
         `failed-${i}`,
@@ -88,6 +112,10 @@ it("migrações: casal compartilha espaço; terceiros e anônimos não acessam d
     const shared = await db.query<{ data: { properties: { name: string }[] } }>(
       "select public.load_household() data",
     );
+    const sharedLiving = await db.query<{
+      data: { items: { name: string }[] };
+    }>("select public.load_living() data");
+    expect(sharedLiving.rows[0].data.items[0].name).toBe("Sofá de teste");
     expect(shared.rows[0].data.properties[0].name).toBe(
       "Cobertura em avaliação",
     );
@@ -105,6 +133,14 @@ it("migrações: casal compartilha espaço; terceiros e anônimos não acessam d
       `set request.jwt.claim.sub='00000000-0000-4000-8000-000000000003';`,
     );
     expect((await db.query("select * from properties")).rows).toHaveLength(0);
+    expect((await db.query("select * from purchase_items")).rows).toHaveLength(
+      0,
+    );
+    await expect(
+      db.query("select public.save_living($1::jsonb,1)", [
+        JSON.stringify(living),
+      ]),
+    ).rejects.toThrow("Acesso reservado");
     expect(
       (await db.query("select * from property_finances")).rows,
     ).toHaveLength(0);

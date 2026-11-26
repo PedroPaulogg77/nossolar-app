@@ -87,3 +87,15 @@ A avaliação possui cinco grupos: financeiro, localização, planta/acabamento,
 - Resolução automática de conflitos entre dispositivos. O acesso dos dois membros é configurado pelo administrador, sem convites públicos.
 
 - Validação em Supabase/Gemini reais e publicação: dependem da configuração manual da conta, sem segredos no código.
+
+## Mobília e Inspirações
+
+Execute `supabase/004_living.sql` depois das migrações anteriores. A atualização cria tabelas separadas e não substitui os imóveis existentes. Usa os mesmos membros autorizados e o mesmo Storage privado.
+
+A navegação principal reúne Imóveis, Mobília e Inspirações. Comparação e Finanças ficam dentro de Imóveis. Em Mobília, cadastre necessidades e alternativas de produto: somente a alternativa escolhida entra nas contas; sem escolha, vale a estimativa manual. Valores desconhecidos aparecem como pendências. Desejos, itens que vocês já têm e itens descartados não entram no orçamento da mudança. Pagamentos com mês informado entram no fluxo de 12 meses dos imóveis.
+
+Inspirações organiza fotos e links em coleções, permite mover referências e associá-las a uma compra. Pins compatíveis podem ser abertos no widget oficial do Pinterest por escolha do usuário; outros links continuam disponíveis como referência.
+
+Os novos módulos salvam diretamente na conta. Use Atualizar ao trocar de aparelho; edições concorrentes são recusadas para evitar sobrescrever a versão mais recente. Sem Supabase configurado, existe armazenamento local para desenvolvimento. As fotos são compactadas para JPEG de até 1600px e 2MB, com até dez fotos por item/opção/referência e limite agregado de 100MB nestas áreas. Não usam serviços pagos nem IA.
+
+Validação: testes de cálculos e de persistência SQL com RLS em PGlite; testes de navegador com respostas Supabase simuladas, cadastro, alternativas, imagens, coleções, persistência e layout móvel. Os testes locais não substituem a confirmação de acesso na conta real.
