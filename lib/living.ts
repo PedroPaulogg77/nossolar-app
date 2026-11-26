@@ -19,6 +19,7 @@ export const priorities = [
   "Não comprar",
 ] as const;
 export const rooms = [
+  "Entrada",
   "Sala",
   "Cozinha",
   "Quarto",
@@ -26,6 +27,8 @@ export const rooms = [
   "Lavanderia",
   "Escritório",
   "Geral",
+  "Mercado inicial",
+  "Serviços",
 ];
 const price = z.number().finite().nonnegative().max(1e9).nullable();
 export const linkSchema = z

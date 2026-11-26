@@ -4,6 +4,8 @@ import {
   Plus,
   Sofa,
   Images,
+  Check,
+  Search,
   ExternalLink,
   Trash2,
   RefreshCw,
@@ -35,7 +37,6 @@ import { supabase } from "@/lib/supabase";
 import type { Attachment } from "@/lib/attachment-types";
 type Store = ReturnType<typeof useLiving>;
 const DRAFT_KEY = "nosso-lar-shopping-draft-v1";
-const CHECKLIST_KEY = "nosso-lar-moving-checklist-v1";
 const STARTER_LIST: {
   room: string;
   group: Purchase["group"];
@@ -247,7 +248,175 @@ const STARTER_LIST: {
       "Lixeira e sacos de lixo",
     ],
   },
+  {
+    room: "Quarto",
+    group: "Móveis e eletrodomésticos",
+    items: [
+      "Cama / base de casal",
+      "Colchão de casal / queen",
+      "Guarda-roupa de casal",
+      "Ar-condicionado",
+      "Camas de solteiro",
+      "Colchões de solteiro",
+    ],
+  },
+  {
+    room: "Sala",
+    group: "Móveis e eletrodomésticos",
+    items: ["Mesa + 4 cadeiras", "Televisão", "Rack / painel da TV"],
+  },
+  {
+    room: "Cozinha",
+    group: "Eletrodomésticos",
+    items: [
+      "Geladeira Frost Free",
+      "Fogão de piso com forno",
+      "Cooktop",
+      "Forno de embutir",
+      "Armários de cozinha",
+      "Purificador de água",
+      "Panela de pressão elétrica",
+    ],
+  },
+  {
+    room: "Cozinha",
+    group: "Utensílios",
+    items: [
+      "Kit utensílios de preparo",
+      "Facas e tábua de corte",
+      "Jogo de pratos e tigelas",
+      "Jogo de copos",
+      "Canecas / xícaras",
+      "Escorredor de louças",
+      "Lixeira de cozinha",
+      "Panos de prato (kit)",
+    ],
+  },
+  {
+    room: "Quarto",
+    group: "Enxoval",
+    items: [
+      "Jogos de lençóis do casal",
+      "Edredom / cobertor",
+      "Protetor do colchão",
+      "Cabides (kit)",
+    ],
+  },
+  {
+    room: "Banheiro",
+    group: "Enxoval",
+    items: ["Toalhas", "Lixeira de banheiro", "Kit acessórios de banheiro"],
+  },
+  {
+    room: "Lavanderia",
+    group: "Eletrodomésticos",
+    items: ["Máquina de lavar", "Lava e seca"],
+  },
+  {
+    room: "Lavanderia",
+    group: "Organização e limpeza",
+    items: [
+      "Varal de chão",
+      "Cesto de roupas",
+      "Vassoura + rodo + pá",
+      "Balde + panos + escovas",
+      "Pregadores (kit)",
+    ],
+  },
+  {
+    room: "Geral",
+    group: "Organização e limpeza",
+    items: [
+      "Lâmpadas (se faltar)",
+      "Extensões / filtro de linha",
+      "Kit ferramentas básico",
+    ],
+  },
+  {
+    room: "Mercado inicial",
+    group: "Supermercado",
+    items: [
+      "Alimentos básicos de despensa",
+      "Carnes e proteínas",
+      "Frutas, verduras e legumes",
+      "Leite, café e itens de café da manhã",
+      "Água / bebidas iniciais",
+      "Produtos de limpeza iniciais",
+      "Higiene pessoal inicial",
+      "Sacos de lixo / esponjas",
+      "Botijão / primeira carga de gás",
+    ],
+  },
+  {
+    room: "Serviços",
+    group: "Serviços",
+    items: [
+      "Frete da mudança",
+      "Fretes extras das lojas",
+      "Montagem de móveis",
+      "Instalação de eletros / fogão",
+      "Instalação de ar-condicionado",
+      "Instalação de box / acessórios",
+      "Limpeza antes da entrada",
+      "Instalação / ativação internet",
+    ],
+  },
 ];
+const STARTER_ALIASES: Record<string, string> = {
+  "Sala|Móveis e eletrodomésticos|Rack ou painel": "Rack / painel da TV",
+  "Sala|Móveis e eletrodomésticos|TV": "Televisão",
+  "Cozinha|Eletrodomésticos|Geladeira": "Geladeira Frost Free",
+  "Cozinha|Eletrodomésticos|Fogão ou cooktop": "Fogão de piso com forno",
+  "Cozinha|Eletrodomésticos|Forno": "Forno de embutir",
+  "Cozinha|Utensílios|Facas": "Facas e tábua de corte",
+  "Cozinha|Utensílios|Tábua de corte": "Facas e tábua de corte",
+  "Cozinha|Utensílios|Pratos": "Jogo de pratos e tigelas",
+  "Cozinha|Utensílios|Copos": "Jogo de copos",
+  "Cozinha|Utensílios|Canecas": "Canecas / xícaras",
+  "Cozinha|Utensílios|Escorredor de louça": "Escorredor de louças",
+  "Quarto|Móveis e eletrodomésticos|Cama": "Cama / base de casal",
+  "Quarto|Móveis e eletrodomésticos|Colchão": "Colchão de casal / queen",
+  "Quarto|Móveis e eletrodomésticos|Guarda-roupa": "Guarda-roupa de casal",
+  "Quarto|Enxoval|Jogo de lençol": "Jogos de lençóis do casal",
+  "Quarto|Enxoval|Protetor de colchão": "Protetor do colchão",
+  "Quarto|Enxoval|Edredom": "Edredom / cobertor",
+  "Quarto|Enxoval|Cobertor": "Edredom / cobertor",
+  "Quarto|Enxoval|Cabides": "Cabides (kit)",
+  "Banheiro|Móveis e eletrodomésticos|Lixeira": "Lixeira de banheiro",
+  "Banheiro|Enxoval|Toalhas de banho": "Toalhas",
+  "Banheiro|Enxoval|Toalhas de rosto": "Toalhas",
+  "Lavanderia|Eletrodomésticos|Varal": "Varal de chão",
+  "Lavanderia|Organização e limpeza|Cesto de roupa": "Cesto de roupas",
+  "Lavanderia|Organização e limpeza|Pregadores": "Pregadores (kit)",
+  "Geral|Organização e limpeza|Lâmpadas extras": "Lâmpadas (se faltar)",
+  "Geral|Organização e limpeza|Kit de ferramentas": "Kit ferramentas básico",
+};
+const canonicalStarterItem = (room: string, group: string, name: string) =>
+  STARTER_ALIASES[`${room}|${group}|${name}`] ?? name;
+const STARTER_CATALOG = STARTER_LIST.reduce<typeof STARTER_LIST>(
+  (catalog, section) => {
+    const names = section.items.map((name) =>
+      canonicalStarterItem(section.room, section.group, name),
+    );
+    const existing = catalog.find(
+      (entry) => entry.room === section.room && entry.group === section.group,
+    );
+    if (existing) {
+      existing.items = [
+        ...new Set([
+          ...existing.items.map((name) =>
+            canonicalStarterItem(section.room, section.group, name),
+          ),
+          ...names,
+        ]),
+      ];
+    } else {
+      catalog.push({ ...section, items: [...new Set(names)] });
+    }
+    return catalog;
+  },
+  [],
+);
 const moments = [
   "Antes das chaves",
   "Na mudança",
@@ -607,31 +776,13 @@ export function LivingPanel({
   store,
   properties,
 }: {
-  area: "Mobília" | "Inspirações";
+  area: "Mobília" | "Inspirações" | "Lista inicial";
   store: Store;
   properties: Property[];
 }) {
   const { data, loading, error, saving, save, reload } = store;
   const [mode, setMode] = useState<"Simulação" | "Comprado">("Simulação");
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [checklist, setChecklist] = useState<string[]>([]);
-  useEffect(() => {
-    try {
-      setChecklist(JSON.parse(localStorage.getItem(CHECKLIST_KEY) ?? "[]"));
-    } catch {
-      setChecklist([]);
-    }
-  }, []);
-  const toggleChecklist = (key: string) =>
-    setChecklist((current) => {
-      const next = current.includes(key)
-        ? current.filter((x) => x !== key)
-        : [...current, key];
-      try {
-        localStorage.setItem(CHECKLIST_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+  const [checklistRoom, setChecklistRoom] = useState("Todos");
   const [group, setGroup] = useState(""),
     [room, setRoom] = useState(""),
     [search, setSearch] = useState("");
@@ -802,42 +953,50 @@ export function LivingPanel({
       <div className="page-heading">
         <div>
           <h1>
-            {area === "Mobília" ? "Compras da casa" : "Ideias para o nosso lar"}
+            {area === "Mobília"
+              ? "Compras da casa"
+              : area === "Lista inicial"
+                ? "Lista para a casa nova"
+                : "Ideias para o nosso lar"}
           </h1>
         </div>
         <div className="living-heading-actions">
-          <button
-            className="text-button living-refresh"
-            aria-label="Atualizar lista"
-            title="Atualizar lista"
-            disabled={loading || saving}
-            onClick={() => void reload()}
-          >
-            <RefreshCw size={16} />
-          </button>
-          <button
-            className="primary"
-            disabled={loading || !!error}
-            onClick={() => {
-              setMessage("");
-              if (area === "Mobília") newItem();
-              else if (!data.collections.length)
-                setEditingCollection({ id: crypto.randomUUID(), name: "" });
-              else
-                setReference({
-                  id: crypto.randomUUID(),
-                  collectionId: collection || data.collections[0].id,
-                  title: "",
-                  url: "",
-                  notes: "",
-                  itemId: null,
-                  photos: [],
-                });
-            }}
-          >
-            <Plus size={18} />
-            {area === "Mobília" ? "Adicionar item" : "Adicionar referência"}
-          </button>
+          {area !== "Lista inicial" && (
+            <button
+              className="text-button living-refresh"
+              aria-label="Atualizar lista"
+              title="Atualizar lista"
+              disabled={loading || saving}
+              onClick={() => void reload()}
+            >
+              <RefreshCw size={16} />
+            </button>
+          )}
+          {area !== "Lista inicial" && (
+            <button
+              className="primary"
+              disabled={loading || !!error}
+              onClick={() => {
+                setMessage("");
+                if (area === "Mobília") newItem();
+                else if (!data.collections.length)
+                  setEditingCollection({ id: crypto.randomUUID(), name: "" });
+                else
+                  setReference({
+                    id: crypto.randomUUID(),
+                    collectionId: collection || data.collections[0].id,
+                    title: "",
+                    url: "",
+                    notes: "",
+                    itemId: null,
+                    photos: [],
+                  });
+              }}
+            >
+              <Plus size={18} />
+              {area === "Mobília" ? "Adicionar item" : "Adicionar referência"}
+            </button>
+          )}
         </div>
       </div>
       {message && !item && !reference && !editingCollection && (
@@ -886,66 +1045,7 @@ export function LivingPanel({
               )}
             </strong>
           </div>
-          <details
-            className="starter-checklist"
-            open={checklistOpen}
-            onToggle={(e) => setChecklistOpen(e.currentTarget.open)}
-          >
-            <summary>
-              Checklist da casa <small>· sugestões fora da simulação</small>
-            </summary>
-            <div className="starter-groups">
-              {STARTER_LIST.map((section) => (
-                <section key={section.room + section.group}>
-                  <h3>
-                    {section.room} <small>{section.group}</small>
-                  </h3>
-                  {section.items.map((name) => {
-                    const key = `${section.room}|${name}`;
-                    const included = data.items.some(
-                      (i) =>
-                        i.room === section.room &&
-                        i.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
-                    );
-                    return (
-                      <label className="starter-item" key={key}>
-                        <input
-                          type="checkbox"
-                          checked={checklist.includes(key) || included}
-                          disabled={included}
-                          onChange={() => toggleChecklist(key)}
-                        />
-                        <span>{name}</span>
-                        {!included && checklist.includes(key) && (
-                          <button
-                            type="button"
-                            className="text-button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const item = {
-                                ...newPurchase(),
-                                name,
-                                room: section.room,
-                                group: section.group,
-                                firstMonth: data.moveMonth,
-                              };
-                              void run({
-                                ...data,
-                                items: [...data.items, item],
-                              });
-                            }}
-                          >
-                            Adicionar
-                          </button>
-                        )}
-                      </label>
-                    );
-                  })}
-                </section>
-              ))}
-            </div>
-          </details>
+
           <details className="living-extra-filters">
             <summary>Buscar</summary>
             <div className="living-filters">
@@ -1200,6 +1300,130 @@ export function LivingPanel({
             onChange={(patch) => void run({ ...data, ...patch })}
           />
         </>
+      ) : area === "Lista inicial" ? (
+        <section className="starter-page">
+          <header className="starter-intro">
+            <div>
+              <span className="eyebrow">GUIA DA CASA</span>
+              <h2>Ideias para cada canto</h2>
+              <p>
+                Explore por ambiente e leve para o planejamento só o que fizer
+                sentido para vocês.
+              </p>
+            </div>
+            <label className="starter-search">
+              <Search size={17} />
+              <input
+                aria-label="Buscar na lista para a casa nova"
+                placeholder="Buscar item ou ambiente"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+          </header>
+          <nav className="starter-filter" aria-label="Filtrar por ambiente">
+            {[
+              "Todos",
+              ...new Set(STARTER_CATALOG.map((section) => section.room)),
+            ].map((roomName) => (
+              <button
+                key={roomName}
+                className={
+                  checklistRoom === roomName ? "chip selected" : "chip"
+                }
+                onClick={() => setChecklistRoom(roomName)}
+              >
+                {roomName}
+              </button>
+            ))}
+          </nav>
+          <div className="starter-groups">
+            {[...new Set(STARTER_CATALOG.map((section) => section.room))]
+              .filter(
+                (roomName) =>
+                  checklistRoom === "Todos" || roomName === checklistRoom,
+              )
+              .map((roomName) => {
+                const sections = STARTER_CATALOG.filter(
+                  (section) => section.room === roomName,
+                )
+                  .map((section) => ({
+                    ...section,
+                    items: section.items.filter((name) =>
+                      `${name} ${section.room} ${section.group}`
+                        .toLocaleLowerCase()
+                        .includes(search.toLocaleLowerCase()),
+                    ),
+                  }))
+                  .filter((section) => section.items.length);
+                if (!sections.length) return null;
+                const itemCount = sections.reduce(
+                  (count, section) => count + section.items.length,
+                  0,
+                );
+                return (
+                  <section className="starter-room" key={roomName}>
+                    <div className="starter-room-heading">
+                      <h2>{roomName}</h2>
+                      <span>
+                        {itemCount} {itemCount === 1 ? "ideia" : "ideias"}
+                      </span>
+                    </div>
+                    {sections.map((section) => (
+                      <div className="starter-subgroup" key={section.group}>
+                        <h3>{section.group}</h3>
+                        <div className="starter-items">
+                          {section.items.map((name) => {
+                            const included = data.items.some(
+                              (purchase) =>
+                                purchase.room === section.room &&
+                                purchase.name.toLocaleLowerCase() ===
+                                  name.toLocaleLowerCase(),
+                            );
+                            return (
+                              <div
+                                className="starter-item"
+                                key={`${section.room}|${name}`}
+                              >
+                                <span>{name}</span>
+                                {included ? (
+                                  <span className="starter-added">
+                                    <Check size={14} /> No planejamento
+                                  </span>
+                                ) : (
+                                  <button
+                                    className="starter-add"
+                                    disabled={saving}
+                                    onClick={() =>
+                                      void run({
+                                        ...data,
+                                        items: [
+                                          ...data.items,
+                                          {
+                                            ...newPurchase(),
+                                            name,
+                                            room: section.room,
+                                            group: section.group,
+                                            firstMonth: data.moveMonth,
+                                          },
+                                        ],
+                                      })
+                                    }
+                                  >
+                                    <Plus size={15} /> Adicionar
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+          </div>
+        </section>
       ) : (
         <>
           <div className="living-tabs">

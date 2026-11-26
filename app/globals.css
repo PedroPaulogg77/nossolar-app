@@ -2663,18 +2663,30 @@ input[type="checkbox"] {
 .product-option-editor .living-option { margin:12px 0 0; }
 .living-photos:focus-visible { outline:2px solid #1b6253; outline-offset:3px; }
 @media(max-width:760px) { .option-choice { grid-template-columns:20px 1fr; } .option-choice b { grid-column:2; } }
-.starter-checklist { margin:18px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-.starter-checklist>summary { cursor:pointer; padding:14px 0; font-size:14px; color:#1b6253; }
-.starter-checklist>summary small { color:var(--muted); font-size:11px; }
-.starter-groups { max-height:540px; overflow:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; padding:8px 0 18px; }
-.starter-groups section h3 { font-size:14px; }
-.starter-groups section h3 small { display:block; color:var(--muted); font-size:11px; font-weight:400; }
-.starter-item { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12px; }
-.starter-item input { accent-color:#1b6253; }
-.starter-item .text-button { margin-left:auto; font-size:11px; }
+.starter-page { max-width:1120px; }
+.starter-intro { display:flex; justify-content:space-between; align-items:end; gap:24px; padding:18px 0 22px; }
+.starter-intro h2 { margin:7px 0 5px; font-size:25px; font-weight:500; letter-spacing:-.03em; }
+.starter-intro p { margin:0; color:var(--muted); font-size:13px; }
+.starter-intro .eyebrow { color:#1b6253; font-size:10px; letter-spacing:.14em; font-weight:650; }
+.starter-search { display:flex; align-items:center; gap:9px; width:min(340px,40%); padding:0 12px; border:1px solid var(--line); border-radius:9px; color:var(--muted); background:white; }
+.starter-search input { width:100%; min-width:0; height:42px; border:0; outline:0; background:transparent; font:inherit; font-size:13px; }
+.starter-filter { display:flex; gap:8px; flex-wrap:wrap; padding:2px 0 20px; }
+.starter-groups { columns:2; column-gap:16px; padding-bottom:32px; }
+.starter-room { display:inline-block; width:100%; min-width:0; margin:0 0 16px; padding:18px 20px 8px; border:1px solid var(--line); border-radius:12px; background:white; break-inside:avoid; }
+.starter-room-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-bottom:10px; border-bottom:1px solid #edf0ed; }
+.starter-room-heading h2 { margin:0; font-size:16px; font-weight:550; }
+.starter-room-heading span { color:var(--muted); font-size:11px; }
+.starter-subgroup { padding:9px 0 2px; }
+.starter-subgroup h3 { margin:0; color:#728078; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.starter-items { padding:3px 0 5px; }
+.starter-item { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #f0f2f0; font-size:13px; }
+.starter-item:last-child { border-bottom:0; }
+.starter-item>span:first-child { min-width:0; }
+.starter-add { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; border:0; background:transparent; color:#1b6253; padding:7px 4px; font:inherit; font-size:11px; cursor:pointer; }
+.starter-add:disabled { opacity:.5; cursor:wait; }
+.starter-added { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; color:#628275; font-size:11px; }
 .shopping-thumb { cursor:pointer; position:relative; }
 .shopping-thumb:focus-visible { outline:2px solid #1b6253; outline-offset:2px; }
 .shopping-thumb:after { content:'Ctrl+V'; display:none; position:absolute; inset:auto 2px 2px; text-align:center; background:#173c2edb; color:white; font-size:9px; border-radius:4px; }
 .shopping-thumb:hover:after,.shopping-thumb:focus:after { display:block; }
-@media(max-width:900px) { .starter-groups { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:600px) { .starter-groups { grid-template-columns:1fr; } }
+@media(max-width:760px) { .starter-intro { align-items:stretch; flex-direction:column; gap:16px; } .starter-intro h2 { font-size:22px; } .starter-search { width:auto; } .starter-groups { columns:1; } .starter-room { padding:15px 16px 6px; margin-bottom:12px; } }

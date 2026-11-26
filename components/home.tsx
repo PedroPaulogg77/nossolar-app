@@ -22,6 +22,7 @@ import {
   MoveUpRight,
   Upload,
   Trash2,
+  ListChecks,
 } from "lucide-react";
 import { Modal } from "./dialog";
 import { LivingPanel } from "./living-panel";
@@ -245,9 +246,9 @@ export default function Home({
   aiProvider: "Groq" | "Gemini";
 }) {
   const living = useLiving();
-  const [area, setArea] = useState<"Imóveis" | "Mobília" | "Inspirações">(
-    "Imóveis",
-  );
+  const [area, setArea] = useState<
+    "Imóveis" | "Mobília" | "Inspirações" | "Lista inicial"
+  >("Imóveis");
   const [properties, setProperties] = useState<Property[]>([]),
     [prefs, setPrefs] = useState(defaults),
     [ready, setReady] = useState(false),
@@ -565,6 +566,7 @@ export default function Home({
           {[
             { name: "Imóveis", icon: LayoutGrid },
             { name: "Mobília", icon: Sofa },
+            { name: "Lista inicial", icon: ListChecks },
             { name: "Inspirações", icon: Images },
           ].map(({ name, icon: Icon }) => (
             <button

@@ -1,5 +1,59 @@
 import { test, expect } from "@playwright/test";
 import { emptyLiving, livingSchema } from "../../lib/living";
+test("catálogo inicial separado permite escolher itens para o planejamento", async ({
+  page,
+}) => {
+  let saved = emptyLiving();
+  await page.route("**/rest/v1/rpc/load_living", (route) =>
+    route.fulfill({ json: saved }),
+  );
+  await page.route("**/rest/v1/rpc/save_living", (route) => {
+    const body = route.request().postDataJSON();
+    saved = {
+      ...livingSchema.parse(body.payload),
+      revision: saved.revision + 1,
+    };
+    return route.fulfill({ json: saved.revision });
+  });
+  await page.route("**/rest/v1/rpc/ensure_household", (route) =>
+    route.fulfill({ json: "00000000-0000-4000-8000-000000000001" }),
+  );
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Lista inicial", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Ideias para cada canto" }),
+  ).toBeVisible();
+  await expect(page.getByText("Fogão de piso com forno")).toBeVisible();
+  await expect(page.getByText("Alimentos básicos de despensa")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/starter-list-desktop.png",
+    fullPage: true,
+  });
+  await page.getByLabel("Buscar na lista para a casa nova").fill("Sofá");
+  await expect(page.getByText("Sofá", { exact: true })).toBeVisible();
+  await page
+    .locator(".starter-item")
+    .filter({ hasText: "Sofá" })
+    .getByRole("button", { name: "Adicionar" })
+    .click();
+  await expect
+    .poll(() => saved.items.some((item) => item.name === "Sofá"))
+    .toBe(true);
+  await page.getByLabel("Buscar na lista para a casa nova").fill("");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/starter-list-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test("compras, alternativas, imagens, persistência e coleções", async ({
   page,
 }) => {
@@ -62,7 +116,7 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   }, encoded);
   await expect(
     page.getByRole("img", { name: "Foto de foto-colada.jpg" }),
-  ).toBeVisible({timeout:20000});
+  ).toBeVisible({ timeout: 20000 });
   for (const [index, price] of [
     [1, 100],
     [2, 150],
