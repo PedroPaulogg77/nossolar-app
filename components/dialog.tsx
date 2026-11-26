@@ -6,18 +6,20 @@ export function Modal({
   description,
   children,
   onClose,
+  className = "",
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
   onClose: () => void;
+  className?: string;
 }) {
   return (
     <Dialog.Root open onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="overlay" />
         <Dialog.Content
-          className="dialog"
+          className={`dialog ${className}`.trim()}
           onInteractOutside={(e) => e.preventDefault()}
         >
           <header className="dialog-head">

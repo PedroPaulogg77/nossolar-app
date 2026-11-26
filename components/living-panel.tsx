@@ -796,11 +796,13 @@ export function LivingPanel({
   store,
   properties,
   selectedPropertyId,
+  onNavigate,
 }: {
   area: "Mobília" | "Inspirações" | "Lista inicial";
   store: Store;
   properties: Property[];
   selectedPropertyId: string;
+  onNavigate: (area: "Mobília" | "Lista inicial") => void;
 }) {
   const { data, loading, error, saving, save, reload } = store;
   const [mode, setMode] = useState<"Simulação" | "Comprado">("Simulação");
@@ -810,6 +812,7 @@ export function LivingPanel({
     [search, setSearch] = useState("");
   const [item, setItem] = useState<Purchase | null>(null),
     [reference, setReference] = useState<Inspiration | null>(null),
+    [viewedReferenceId, setViewedReferenceId] = useState<string | null>(null),
     [collection, setCollection] = useState(""),
     [editingCollection, setEditingCollection] = useState<{
       id: string;
@@ -973,6 +976,9 @@ export function LivingPanel({
     (r) => !collection || r.collectionId === collection,
   );
   const selectedCollection = data.collections.find((c) => c.id === collection);
+  const viewedReference = data.inspirations.find(
+    (r) => r.id === viewedReferenceId,
+  );
   return (
     <>
       <div className="page-heading">
@@ -997,35 +1003,36 @@ export function LivingPanel({
               <RefreshCw size={16} />
             </button>
           )}
-          {area !== "Lista inicial" && (
-            <button
-              className="primary"
-              disabled={loading || !!error}
-              onClick={() => {
-                setMessage("");
-                if (area === "Mobília") newItem();
-                else if (!collection)
-                  setEditingCollection({ id: crypto.randomUUID(), name: "" });
-                else
-                  setReference({
-                    id: crypto.randomUUID(),
-                    collectionId: collection,
-                    title: "",
-                    url: "",
-                    notes: "",
-                    itemId: null,
-                    photos: [],
-                  });
-              }}
-            >
-              <Plus size={18} />
-              {area === "Mobília"
-                ? "Adicionar item"
-                : collection
-                  ? "Guardar inspiração"
-                  : "Nova coleção"}
-            </button>
-          )}
+          {area !== "Lista inicial" &&
+            !(area === "Mobília" && data.items.length === 0) && (
+              <button
+                className="primary"
+                disabled={loading || !!error}
+                onClick={() => {
+                  setMessage("");
+                  if (area === "Mobília") newItem();
+                  else if (!collection)
+                    setEditingCollection({ id: crypto.randomUUID(), name: "" });
+                  else
+                    setReference({
+                      id: crypto.randomUUID(),
+                      collectionId: collection,
+                      title: "",
+                      url: "",
+                      notes: "",
+                      itemId: null,
+                      photos: [],
+                    });
+                }}
+              >
+                <Plus size={18} />
+                {area === "Mobília"
+                  ? "Adicionar item"
+                  : collection
+                    ? "Guardar inspiração"
+                    : "Nova coleção"}
+              </button>
+            )}
         </div>
       </div>
       {message && !item && !reference && !editingCollection && (
@@ -1111,8 +1118,11 @@ export function LivingPanel({
                   : "Nossa lista está aberta"}
               </h3>
               <p>
-                Adicione um item pelo nome. Fotos, preços e alternativas podem
-                vir depois.
+                {mode === "Comprado"
+                  ? "Quando comprarmos algo, ele aparece aqui."
+                  : group || room || search
+                    ? "Não encontramos itens com esses filtros."
+                    : "Comece com uma ideia ou crie um item da sua lista."}
               </p>
               {(group || room || search) && (
                 <button
@@ -1125,6 +1135,27 @@ export function LivingPanel({
                 >
                   Limpar filtros
                 </button>
+              )}
+              {!group && !room && !search && mode === "Comprado" && (
+                <button
+                  className="secondary"
+                  onClick={() => setMode("Simulação")}
+                >
+                  Ver simulação
+                </button>
+              )}
+              {!group && !room && !search && mode === "Simulação" && (
+                <div className="empty-next-actions">
+                  <button className="primary" onClick={newItem}>
+                    Adicionar item
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => onNavigate("Lista inicial")}
+                  >
+                    Explorar lista inicial
+                  </button>
+                </div>
               )}
             </div>
           ) : (
@@ -1467,9 +1498,12 @@ export function LivingPanel({
                               >
                                 <span>{name}</span>
                                 {included ? (
-                                  <span className="starter-added">
-                                    <Check size={14} /> No planejamento
-                                  </span>
+                                  <button
+                                    className="starter-added"
+                                    onClick={() => onNavigate("Mobília")}
+                                  >
+                                    <Check size={14} /> Ver no planejamento
+                                  </button>
                                 ) : (
                                   <button
                                     className="starter-add"
@@ -1614,6 +1648,22 @@ export function LivingPanel({
                     Guarde uma foto, um link ou uma referência para este
                     ambiente.
                   </p>
+                  <button
+                    className="secondary"
+                    onClick={() =>
+                      setReference({
+                        id: crypto.randomUUID(),
+                        collectionId: collection,
+                        title: "",
+                        url: "",
+                        notes: "",
+                        itemId: null,
+                        photos: [],
+                      })
+                    }
+                  >
+                    Guardar primeira ideia
+                  </button>
                 </div>
               ) : (
                 <div className="living-grid inspirations-grid">
@@ -1623,7 +1673,7 @@ export function LivingPanel({
                       key={r.id}
                       onClick={() => {
                         setMessage("");
-                        setReference(structuredClone(r));
+                        setViewedReferenceId(r.id);
                       }}
                     >
                       <div className="living-cover">
@@ -1653,6 +1703,69 @@ export function LivingPanel({
             </section>
           )}
         </>
+      )}
+      {viewedReference && (
+        <Modal
+          title={viewedReference.title || "Uma inspiração"}
+          description={
+            data.collections.find((c) => c.id === viewedReference.collectionId)
+              ?.name || "Inspirações"
+          }
+          className="property-overview-dialog"
+          onClose={() => setViewedReferenceId(null)}
+        >
+          <div className="property-overview-body">
+            {viewedReference.photos[0] && (
+              <div className="property-overview-hero">
+                <AttachmentCover
+                  file={viewedReference.photos[0]}
+                  name={viewedReference.title || "Inspiração"}
+                  fallback={<Images size={30} />}
+                />
+              </div>
+            )}
+            <div className="property-overview-content">
+              {viewedReference.notes && (
+                <section className="property-overview-section">
+                  <h3>O que gostamos aqui</h3>
+                  <p>{viewedReference.notes}</p>
+                </section>
+              )}
+              {viewedReference.itemId && (
+                <section className="property-overview-section">
+                  <h3>Ligada à compra</h3>
+                  <p>
+                    {
+                      data.items.find((i) => i.id === viewedReference.itemId)
+                        ?.name
+                    }
+                  </p>
+                </section>
+              )}
+              {viewedReference.url && (
+                <a
+                  className="primary"
+                  href={viewedReference.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir referência original <ExternalLink size={15} />
+                </a>
+              )}
+            </div>
+          </div>
+          <div className="dialog-footer">
+            <button
+              className="secondary"
+              onClick={() => {
+                setViewedReferenceId(null);
+                setReference(structuredClone(viewedReference));
+              }}
+            >
+              Editar inspiração
+            </button>
+          </div>
+        </Modal>
       )}
       {item && (
         <Modal

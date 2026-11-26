@@ -197,6 +197,7 @@ test("preferências, formulário inválido, favoritos e IA desligada", async ({
 test("entrada parcial, reserva e ficha ampla", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   const dialog = page.getByRole("dialog");
   const width = await dialog.evaluate((el) => el.getBoundingClientRect().width);
   expect(width).toBeGreaterThan(900);

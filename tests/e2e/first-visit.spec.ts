@@ -68,6 +68,10 @@ test("primeira visita abre imóveis compartilhados e orienta a primeira ação",
   ).toBe(true);
   await page.getByRole("button", { name: "Ver um imóvel" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Ver gastos por mês" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page.getByLabel("Preço anunciado (R$)").fill("350.000,00");
   await page.getByRole("button", { name: "Salvar alterações" }).click();
   await expect.poll(() => sharedPrice).toBe(350000);

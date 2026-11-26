@@ -27,6 +27,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import { Modal } from "./dialog";
+import { PropertyOverview } from "./property-overview";
 import { LivingPanel } from "./living-panel";
 import { useLiving } from "@/lib/living-store";
 import { purchasesFlow } from "@/lib/living";
@@ -189,6 +190,7 @@ export default function Home({
     [cityFilter, setCityFilter] = useState(""),
     [neighborhoodFilter, setNeighborhoodFilter] = useState(""),
     [draft, setDraft] = useState<Property | null>(null),
+    [viewingId, setViewingId] = useState<string | null>(null),
     [section, setSection] = useState("Visão geral"),
     [isNew, setIsNew] = useState(false),
     [settings, setSettings] = useState(false),
@@ -635,6 +637,7 @@ export default function Home({
       </div>
     ) : null;
   const current = properties.find((p) => p.id === financialId) ?? properties[0];
+  const viewed = properties.find((p) => p.id === viewingId);
   const flowMonths = 36;
   const propertyFlow = current ? cashflow(current, start, flowMonths) : null;
   const shoppingFlow = purchasesFlow(living.data.items, start, flowMonths);
@@ -809,13 +812,14 @@ export default function Home({
                               className="primary"
                               onClick={() => {
                                 dismissWelcome();
-                                open(
-                                  properties.length
-                                    ? (properties.find((p) => p.favorite) ??
-                                        properties[0])
-                                    : newProperty(),
-                                  !properties.length,
-                                );
+                                if (properties.length)
+                                  setViewingId(
+                                    (
+                                      properties.find((p) => p.favorite) ??
+                                      properties[0]
+                                    ).id,
+                                  );
+                                else open(newProperty(), true);
                               }}
                             >
                               {properties.length
@@ -990,7 +994,7 @@ export default function Home({
                             </div>
                             <button
                               className="card-main"
-                              onClick={() => open(p)}
+                              onClick={() => setViewingId(p.id)}
                             >
                               <div className="card-status">
                                 <span className="status-dot" />
@@ -1240,7 +1244,7 @@ export default function Home({
                                 </p>
                                 <button
                                   className="text-button"
-                                  onClick={() => open(p)}
+                                  onClick={() => setViewingId(p.id)}
                                 >
                                   Abrir ficha <ArrowRight size={15} />
                                 </button>
@@ -1371,6 +1375,12 @@ export default function Home({
                                 Confirme {flow.pending.join(", ").toLowerCase()}
                                 . As barras mostram os valores com mês definido.
                               </p>
+                              <button
+                                className="text-button"
+                                onClick={() => open(current, false, "Custos")}
+                              >
+                                Completar proposta <ArrowRight size={15} />
+                              </button>
                             </details>
                           )}
                           <div className="chart-period">
@@ -1526,6 +1536,7 @@ export default function Home({
               store={living}
               properties={properties}
               selectedPropertyId={financialId}
+              onNavigate={setArea}
             />
           )}
           <footer className="page-footer">
@@ -1541,6 +1552,39 @@ export default function Home({
             <X size={16} />
           </button>
         </div>
+      )}
+      {viewed && (
+        <PropertyOverview
+          property={viewed}
+          onClose={() => setViewingId(null)}
+          onNotice={setNotice}
+          onEdit={() => {
+            setViewingId(null);
+            open(viewed);
+          }}
+          onPlan={() => {
+            setFinancialId(viewed.id);
+            setTab("Finanças");
+            setArea("Imóveis");
+            setViewingId(null);
+          }}
+          onCompare={() => {
+            if (selected.length === 3 && !selected.includes(viewed.id))
+              setNotice(
+                "Este imóvel substituiu a terceira opção da comparação.",
+              );
+            setSelected((ids) =>
+              ids.includes(viewed.id)
+                ? ids
+                : ids.length < 3
+                  ? [...ids, viewed.id]
+                  : [...ids.slice(0, 2), viewed.id],
+            );
+            setTab("Comparar");
+            setArea("Imóveis");
+            setViewingId(null);
+          }}
+        />
       )}
       {draft && (
         <Modal

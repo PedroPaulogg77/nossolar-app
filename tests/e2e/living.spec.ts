@@ -266,6 +266,13 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   await page.getByRole("button", { name: "Coleções" }).click();
   await page.getByRole("button", { name: /Sala/ }).click();
   await page.getByRole("heading", { name: "Luz natural" }).click();
+  await expect(
+    page.getByRole("link", { name: "Abrir referência original" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/inspiration-resumo-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  await page.getByRole("button", { name: "Editar inspiração" }).click();
   await page
     .getByRole("combobox", { name: "Coleção", exact: true })
     .selectOption({ label: "Quarto" });

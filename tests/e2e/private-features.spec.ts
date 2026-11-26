@@ -85,6 +85,7 @@ test("anexos persistem, abrem e acompanham cópia completa", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page
     .getByLabel("O que vamos guardar?")
     .selectOption("Plano de pagamento");
@@ -101,6 +102,15 @@ test("anexos persistem, abrem e acompanham cópia completa", async ({
   await page.getByRole("button", { name: "Salvar alterações" }).click();
   await page.reload();
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  const overviewDownload = page.waitForEvent("download");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Proposta-teste.pdf" })
+    .click();
+  expect(
+    await fs.readFile((await (await overviewDownload).path())!, "utf8"),
+  ).toContain("%PDF-1.7");
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page
     .getByRole("button", { name: /Proposta-teste\.pdf\s+Plano de pagamento/ })
     .click();
@@ -158,6 +168,7 @@ test("anexos persistem, abrem e acompanham cópia completa", async ({
   await expect(page.getByText("Backup restaurado.")).toBeVisible();
   await page.getByRole("button", { name: "Salvar preferências" }).click();
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page
     .getByRole("button", { name: /Proposta-teste\.pdf\s+Plano de pagamento/ })
     .click();
@@ -173,6 +184,7 @@ test("rejeita arquivo disfarçado e mostra foto real anexada no card", async ({
 }) => {
   await page.goto("/");
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page.getByLabel("Anexar arquivos", { exact: true }).setInputFiles({
     name: "invalido.pdf",
     mimeType: "application/pdf",
@@ -202,6 +214,7 @@ test("rejeita arquivo disfarçado e mostra foto real anexada no card", async ({
 test("cola foto diretamente na ficha do imóvel", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("heading", { name: "Cobertura em avaliação" }).click();
+  await page.getByRole("button", { name: "Editar informações" }).click();
   await page.evaluate(() => {
     const bytes = Uint8Array.from(
       atob(
