@@ -959,9 +959,7 @@ main {
   max-width: 180px;
 }
 .pending {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  display: block;
   padding: 12px 15px;
   background: #f8f5ed;
   color: #8a713f;
@@ -969,8 +967,9 @@ main {
   font-size: 11px;
 }
 .pending p {
-  margin: 0;
+  margin: 9px 0 0;
 }
+.pending summary { cursor:pointer; font-weight:600; }
 .pending .status-dot {
   background: #a58b55;
 }
@@ -2247,6 +2246,19 @@ input[type="checkbox"] {
 .chart {
   gap: 14px;
 }
+.chart-period { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; color:var(--muted); font-size:12px; }
+.chart-period .text-button:disabled { opacity:.35; cursor:default; }
+.entry-heading { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:22px 0 12px; }
+.entry-heading h3 { margin:0; }
+.entry-heading strong { white-space:nowrap; font-size:19px; font-weight:600; }
+.entry-schedule { display:grid; gap:12px; }
+.entry-step { border:1px solid var(--line); border-radius:10px; padding:16px; background:#fbfcfb; }
+.entry-step-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+.entry-step-head strong { font-size:14px; }
+.entry-step>small { display:block; color:var(--muted); margin-top:8px; }
+.entry-step .form-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(150px,.65fr); align-items:end; }
+@media(max-width:760px) { .entry-step .form-grid { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:530px) { .entry-heading { align-items:flex-start; flex-direction:column; gap:5px; } .chart-period { gap:6px; } .chart-period .text-button { padding:7px 0; } }
 .bar i {
   border-top: 1px solid #ffffff9e;
 }

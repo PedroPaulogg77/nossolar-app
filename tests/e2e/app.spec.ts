@@ -1,6 +1,75 @@
 import { test, expect } from "@playwright/test";
 import { seedTestProperty } from "./seed";
+import { emptyLiving } from "../../lib/living";
 test.beforeEach(async ({ page }) => seedTestProperty(page));
+test("mobília inclui o imóvel único no planejamento", async ({ page }) => {
+  await page.route("**/rest/v1/rpc/load_living", (route) =>
+    route.fulfill({ json: emptyLiving() }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mobília", exact: true }).click();
+  await page.getByText("Ver gastos mês a mês").click();
+  await expect(
+    page.getByLabel("Imóvel no planejamento").locator("option:checked"),
+  ).toHaveText("Cobertura em avaliação");
+});
+test("entrada em etapas mostra o pagamento final no ano seguinte", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Finanças", exact: true }).click();
+  await page.getByRole("button", { name: "Ajustar custos" }).click();
+  await page
+    .getByRole("button", { name: "Detalhar entrada em etapas" })
+    .click();
+  for (const [index, amount, month, installments] of [
+    [1, "30.000,00", "2026-12", "1"],
+    [2, "25.000,00", "2026-12", "12"],
+    [3, "25.000,00", "2027-12", "1"],
+  ] as const) {
+    if (index > 1)
+      await page.getByRole("button", { name: "Adicionar pagamento" }).click();
+    await page.getByLabel(`Valor do pagamento ${index} (R$)`).fill(amount);
+    await page
+      .getByLabel(`Mês do pagamento ${index}: mês`)
+      .selectOption(month.slice(5));
+    await page
+      .getByLabel(`Mês do pagamento ${index}: ano`)
+      .selectOption(month.slice(0, 4));
+    await page
+      .getByLabel(`Parcelas do pagamento ${index}`)
+      .selectOption(installments);
+  }
+  await expect(page.getByText("R$ 80.000,00", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/entrada-form-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/entrada-form-mobile.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await page.getByRole("button", { name: "Próximos" }).click();
+  await expect(
+    page.getByRole("button", { name: /dez\/27: R\$ 25\.000,00/ }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/entrada-etapas-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/entrada-etapas-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
 test("cadastro, persistência, comparação, avaliação e finanças", async ({
   page,
 }) => {
@@ -135,7 +204,7 @@ test("entrada parcial, reserva e ficha ampla", async ({ page }) => {
   await expect(page.getByLabel("Varanda")).toBeVisible();
   await page.getByRole("button", { name: "Custos", exact: true }).click();
   await page.getByLabel("Entrada em dinheiro (R$)").fill("90000");
-  await page.getByLabel("Entrada parcelada").check();
+  await page.getByLabel("Parcelar parte da entrada").check();
   await page.getByLabel("Parte da entrada a parcelar").fill("30000");
   await page.getByLabel("Número de parcelas dessa parte").fill("3");
   await page.getByLabel("Mês da entrada / sinal: mês").selectOption("01");
@@ -158,7 +227,7 @@ test("entrada parcial, reserva e ficha ampla", async ({ page }) => {
   await page.reload();
   await page.getByRole("button", { name: "Finanças", exact: true }).click();
   await expect(page.getByLabel("Valor disponível hoje (R$)")).toHaveValue(
-    "50000",
+    "50.000,00",
   );
   await page.screenshot({
     path: "test-results/desktop-finance-reserve.png",

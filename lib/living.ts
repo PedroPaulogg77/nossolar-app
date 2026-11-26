@@ -210,7 +210,14 @@ export function mergeDuplicatePurchase(
         (option) =>
           !existing.options.some(
             (old) =>
-              normalizedItemName(old.name) === normalizedItemName(option.name),
+              (old.url && old.url === option.url) ||
+              (!old.url &&
+                !option.url &&
+                normalizedItemName(old.name) ===
+                  normalizedItemName(option.name) &&
+                normalizedItemName(old.store) ===
+                  normalizedItemName(option.store) &&
+                old.price === option.price),
           ),
       ),
     ],

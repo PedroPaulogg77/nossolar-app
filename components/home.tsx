@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CurrencyInput } from "@/components/currency-input";
 import { parseLocalizedNumber } from "@/lib/localized-number";
+import { Field } from "@/components/property-field";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -131,95 +131,6 @@ const aiNumericKeys = new Set([
   "installments",
   "payment",
 ]);
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  ...rest
-}: {
-  label: string;
-  value: string | number | null;
-  onChange: (v: string) => void;
-  type?: string;
-  min?: number;
-  max?: number;
-  step?: string;
-}) {
-  if (type === "month") {
-    const current = String(value ?? "");
-    const [year, month] = current.split("-");
-    const years = Array.from({ length: 31 }, (_, i) => 2024 + i);
-    return (
-      <div className="field">
-        <span>{label}</span>
-        <div className="month-pickers">
-          <select
-            aria-label={`${label}: mês`}
-            value={month ?? ""}
-            onChange={(e) =>
-              onChange(
-                e.target.value
-                  ? `${year || new Date().getFullYear()}-${e.target.value}`
-                  : "",
-              )
-            }
-          >
-            <option value="">Mês</option>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i} value={String(i + 1).padStart(2, "0")}>
-                {new Date(2024, i, 1).toLocaleDateString("pt-BR", {
-                  month: "long",
-                })}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label={`${label}: ano`}
-            value={year ?? ""}
-            onChange={(e) =>
-              onChange(
-                e.target.value ? `${e.target.value}-${month || "01"}` : "",
-              )
-            }
-          >
-            <option value="">Ano</option>
-            {years.map((y) => (
-              <option key={y}>{y}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    );
-  }
-  if (type === "currency") {
-    const raw = String(value ?? "");
-    return (
-      <label className="field">
-        <span>{label}</span>
-        <CurrencyInput
-          value={parseLocalizedNumber(raw) ?? null}
-          onChange={(v) => onChange(v === null ? "" : String(v))}
-          placeholder="0,00"
-        />
-      </label>
-    );
-  }
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <input
-        {...rest}
-        type={type}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={type === "number" ? "Não informado" : ""}
-        min={type === "number" ? 0 : undefined}
-        step={type === "number" ? "any" : undefined}
-      />
-    </label>
-  );
-}
 function Metric({
   label,
   value,
@@ -285,6 +196,7 @@ export default function Home({
       new Date().toLocaleDateString("sv-SE").slice(0, 7),
     ),
     [month, setMonth] = useState(0),
+    [period, setPeriod] = useState(0),
     [notice, setNotice] = useState(""),
     [email, setEmail] = useState(""),
     [user, setUser] = useState(""),
@@ -538,8 +450,9 @@ export default function Home({
       </div>
     ) : null;
   const current = properties.find((p) => p.id === financialId) ?? properties[0];
-  const propertyFlow = current ? cashflow(current, start) : null;
-  const shoppingFlow = purchasesFlow(living.data.items, start);
+  const flowMonths = 36;
+  const propertyFlow = current ? cashflow(current, start, flowMonths) : null;
+  const shoppingFlow = purchasesFlow(living.data.items, start, flowMonths);
   const flow = propertyFlow
     ? {
         pending: [
@@ -1124,8 +1037,8 @@ export default function Home({
                             <h2>Quanto temos guardado hoje?</h2>
                             <p>
                               Atualize quando esse valor mudar. A reserva é
-                              comparada com a entrada à vista, a documentação e
-                              os gastos eventuais registrados.
+                              comparada com os pagamentos à vista da entrada, a
+                              documentação e os gastos eventuais registrados.
                             </p>
                           </div>
                           <Field
@@ -1145,13 +1058,13 @@ export default function Home({
                             <small>
                               {acquisitionGap(current, prefs.savings) === null
                                 ? "Complete a reserva, a entrada e a documentação para calcular."
-                                : "Inclui os gastos eventuais registrados; veja o mês de cada pagamento abaixo."}
+                                : "Soma os valores à vista de todos os meses. Veja as datas abaixo."}
                             </small>
                           </div>
                         </section>
                         <div className="metrics">
                           <Metric
-                            label="Entrada à vista + documentação"
+                            label="Pagamentos à vista + documentação"
                             value={money(
                               entryParts(current).upfront === null ||
                                 documentation(current) === null
@@ -1159,7 +1072,7 @@ export default function Home({
                                 : entryParts(current).upfront! +
                                     documentation(current)!,
                             )}
-                            help="A parte parcelada aparece nos meses seguintes"
+                            help="Veja a distribuição por mês abaixo"
                           />
                           <Metric
                             label="Prestação informada"
@@ -1203,64 +1116,101 @@ export default function Home({
                             />
                           </div>
                           {flow.pending.length > 0 && (
-                            <div className="pending">
-                              <span className="status-dot" />
+                            <details className="pending">
+                              <summary>
+                                Planejamento parcial · {flow.pending.length}{" "}
+                                informações pendentes
+                              </summary>
                               <p>
-                                <strong>Planejamento parcial</strong> · Confirme{" "}
-                                {flow.pending.join(", ").toLowerCase()}. As
-                                barras mostram apenas valores com mês definido.
+                                Confirme {flow.pending.join(", ").toLowerCase()}
+                                . As barras mostram os valores com mês definido.
                               </p>
-                            </div>
+                            </details>
                           )}
+                          <div className="chart-period">
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={period === 0}
+                              onClick={() => {
+                                setPeriod(period - 1);
+                                setMonth((period - 1) * 12);
+                              }}
+                            >
+                              Anteriores
+                            </button>
+                            <span>
+                              {flow.months[period * 12].label} –{" "}
+                              {flow.months[period * 12 + 11].label}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={period >= flowMonths / 12 - 1}
+                              onClick={() => {
+                                setPeriod(period + 1);
+                                setMonth((period + 1) * 12);
+                              }}
+                            >
+                              Próximos
+                            </button>
+                          </div>
                           <div
                             className="chart"
-                            aria-label="Fluxo de caixa em 12 meses"
+                            aria-label={`Fluxo de caixa de ${flow.months[period * 12].label} a ${flow.months[period * 12 + 11].label}`}
                           >
-                            {flow.months.map((m, i) => (
-                              <button
-                                key={m.key}
-                                className={
-                                  "chart-column " +
-                                  (i === month ? "focused" : "")
-                                }
-                                onClick={() => setMonth(i)}
-                                aria-label={`${m.label}: ${money(m.total)} em valores conhecidos`}
-                              >
-                                <span className="bar-track">
-                                  <span
-                                    className="bar"
-                                    style={{
-                                      height: `${m.total ? Math.max(3, (m.total / Math.max(...flow.months.map((x) => x.total), 1)) * 100) : 0}%`,
-                                    }}
-                                  >
-                                    {m.values.map(
-                                      (v, j) =>
-                                        v > 0 && (
-                                          <i
-                                            key={j}
-                                            style={{
-                                              height: `${(v / m.total) * 100}%`,
-                                              background: `var(--cash-${j})`,
-                                            }}
-                                          />
-                                        ),
-                                    )}
+                            {flow.months
+                              .map((m, i) => ({ m, i }))
+                              .filter(({ i }) => Math.floor(i / 12) === period)
+                              .map(({ m, i }) => (
+                                <button
+                                  key={m.key}
+                                  className={
+                                    "chart-column " +
+                                    (i === month ? "focused" : "")
+                                  }
+                                  onClick={() => setMonth(i)}
+                                  aria-label={`${m.label}: ${money(m.total)} em valores conhecidos`}
+                                >
+                                  <span className="bar-track">
+                                    <span
+                                      className="bar"
+                                      style={{
+                                        height: `${m.total ? Math.max(3, (m.total / Math.max(...flow.months.map((x) => x.total), 1)) * 100) : 0}%`,
+                                      }}
+                                    >
+                                      {m.values.map(
+                                        (v, j) =>
+                                          v > 0 && (
+                                            <i
+                                              key={j}
+                                              style={{
+                                                height: `${(v / m.total) * 100}%`,
+                                                background: `var(--cash-${j})`,
+                                              }}
+                                            />
+                                          ),
+                                      )}
+                                    </span>
                                   </span>
-                                </span>
-                                <span className="month-label">
-                                  {m.label.split("/")[0]}
-                                  <small>{m.label.split("/")[1]}</small>
-                                </span>
-                              </button>
-                            ))}
+                                  <span className="month-label">
+                                    {m.label.split("/")[0]}
+                                    <small>{m.label.split("/")[1]}</small>
+                                  </span>
+                                </button>
+                              ))}
                           </div>
                           <div className="legend">
-                            {flowLabels.map((l, i) => (
-                              <span key={l}>
-                                <i style={{ background: `var(--cash-${i})` }} />
-                                {l}
-                              </span>
-                            ))}
+                            {flowLabels.map((l, i) =>
+                              flow.months.some((m) => m.values[i] > 0) ? (
+                                <span key={l}>
+                                  <i
+                                    style={{ background: `var(--cash-${i})` }}
+                                  />
+                                  {l}
+                                </span>
+                              ) : null,
+                            )}
                           </div>
                           <div className="month-detail">
                             <div>
@@ -1325,7 +1275,12 @@ export default function Home({
               )}
             </>
           ) : (
-            <LivingPanel area={area} store={living} properties={properties} />
+            <LivingPanel
+              area={area}
+              store={living}
+              properties={properties}
+              selectedPropertyId={financialId}
+            />
           )}
           <footer className="page-footer">
             <span>nosso lar.</span>
@@ -1650,12 +1605,6 @@ export default function Home({
                 </div>
                 <h3>Entrada e financiamento</h3>
                 <div className="form-grid">
-                  <Field
-                    label="Entrada em dinheiro (R$)"
-                    type="currency"
-                    value={draft.finance.cashEntry}
-                    onChange={(v) => fin("cashEntry", number(v))}
-                  />
                   {(
                     [
                       ["financed", "Financiamento informado"],
@@ -1671,55 +1620,218 @@ export default function Home({
                     />
                   ))}
                   <Field
-                    label="Mês da entrada / sinal"
-                    type="month"
-                    value={draft.finance.entryMonth}
-                    onChange={(v) => fin("entryMonth", v)}
-                  />
-                  <Field
                     label="Início da prestação"
                     type="month"
                     value={draft.finance.paymentMonth}
                     onChange={(v) => fin("paymentMonth", v)}
                   />
                 </div>
-                <p className="hint">
-                  Informe a entrada conforme a proposta. Se deixar em branco,
-                  ela só será calculada quando todos os dados necessários
-                  estiverem disponíveis.
-                </p>
-                <label className="check-label">
-                  <input
-                    type="checkbox"
-                    checked={draft.finance.split}
-                    onChange={(e) => fin("split", e.target.checked)}
-                  />
-                  Entrada parcelada
-                </label>
-                {draft.finance.split && (
-                  <div className="form-grid">
-                    <Field
-                      label="Parte da entrada a parcelar"
-                      type="currency"
-                      value={draft.finance.installmentTotal}
-                      onChange={(v) => fin("installmentTotal", number(v))}
-                    />
-                    <div className="inline-total">
-                      Parte à vista
-                      <strong>{money(entryParts(draft).upfront)}</strong>
+                <div className="entry-heading">
+                  <h3>Como vamos pagar a entrada?</h3>
+                  <strong>{money(entry(draft))}</strong>
+                </div>
+                {draft.finance.entrySchedule.length === 0 ? (
+                  <>
+                    <div className="form-grid">
+                      <Field
+                        label="Entrada em dinheiro (R$)"
+                        type="currency"
+                        value={draft.finance.cashEntry}
+                        onChange={(v) => fin("cashEntry", number(v))}
+                      />
+                      <Field
+                        label="Mês da entrada / sinal"
+                        type="month"
+                        value={draft.finance.entryMonth}
+                        onChange={(v) => fin("entryMonth", v)}
+                      />
                     </div>
-                    <Field
-                      label="Início das parcelas (se diferente do sinal)"
-                      type="month"
-                      value={draft.finance.installmentMonth}
-                      onChange={(v) => fin("installmentMonth", v)}
-                    />
-                    <Field
-                      label="Número de parcelas dessa parte"
-                      type="number"
-                      value={draft.finance.installments}
-                      onChange={(v) => fin("installments", Number(v))}
-                    />
+                    <label className="check-label">
+                      <input
+                        type="checkbox"
+                        checked={draft.finance.split}
+                        onChange={(e) => fin("split", e.target.checked)}
+                      />
+                      Parcelar parte da entrada
+                    </label>
+                    {draft.finance.split && (
+                      <div className="form-grid">
+                        <Field
+                          label="Parte da entrada a parcelar"
+                          type="currency"
+                          value={draft.finance.installmentTotal}
+                          onChange={(v) => fin("installmentTotal", number(v))}
+                        />
+                        <div className="inline-total">
+                          Parte à vista
+                          <strong>{money(entryParts(draft).upfront)}</strong>
+                        </div>
+                        <Field
+                          label="Início das parcelas (se diferente do sinal)"
+                          type="month"
+                          value={draft.finance.installmentMonth}
+                          onChange={(v) => fin("installmentMonth", v)}
+                        />
+                        <Field
+                          label="Número de parcelas dessa parte"
+                          type="number"
+                          value={draft.finance.installments}
+                          onChange={(v) => fin("installments", Number(v))}
+                        />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        const parts = entryParts(draft);
+                        const steps: Finance["entrySchedule"] = [];
+                        if (parts.upfront !== null && parts.upfront > 0)
+                          steps.push({
+                            id: crypto.randomUUID(),
+                            amount: parts.upfront,
+                            month: draft.finance.entryMonth,
+                            installments: 1,
+                          });
+                        if (
+                          parts.installments !== null &&
+                          parts.installments > 0
+                        )
+                          steps.push({
+                            id: crypto.randomUUID(),
+                            amount: parts.installments,
+                            month:
+                              draft.finance.installmentMonth ||
+                              draft.finance.entryMonth,
+                            installments: draft.finance.installments,
+                          });
+                        fin(
+                          "entrySchedule",
+                          steps.length
+                            ? steps
+                            : [
+                                {
+                                  id: crypto.randomUUID(),
+                                  amount: null,
+                                  month: "",
+                                  installments: 1,
+                                },
+                              ],
+                        );
+                      }}
+                    >
+                      <Plus size={16} /> Detalhar entrada em etapas
+                    </button>
+                  </>
+                ) : (
+                  <div className="entry-schedule">
+                    {draft.finance.entrySchedule.map((payment, index) => (
+                      <div className="entry-step" key={payment.id}>
+                        <div className="entry-step-head">
+                          <strong>Pagamento {index + 1}</strong>
+                          <button
+                            type="button"
+                            className="text-button"
+                            aria-label={`Remover pagamento ${index + 1}`}
+                            onClick={() =>
+                              fin(
+                                "entrySchedule",
+                                draft.finance.entrySchedule.filter(
+                                  (step) => step.id !== payment.id,
+                                ),
+                              )
+                            }
+                          >
+                            <Trash2 size={16} /> Remover
+                          </button>
+                        </div>
+                        <div className="form-grid">
+                          <Field
+                            label={`Valor do pagamento ${index + 1} (R$)`}
+                            type="currency"
+                            value={payment.amount}
+                            onChange={(v) =>
+                              fin(
+                                "entrySchedule",
+                                draft.finance.entrySchedule.map((step) =>
+                                  step.id === payment.id
+                                    ? { ...step, amount: number(v) }
+                                    : step,
+                                ),
+                              )
+                            }
+                          />
+                          <Field
+                            label={`Mês do pagamento ${index + 1}`}
+                            type="month"
+                            value={payment.month}
+                            onChange={(v) =>
+                              fin(
+                                "entrySchedule",
+                                draft.finance.entrySchedule.map((step) =>
+                                  step.id === payment.id
+                                    ? { ...step, month: v }
+                                    : step,
+                                ),
+                              )
+                            }
+                          />
+                          <label className="field">
+                            <span>Como pagar</span>
+                            <select
+                              aria-label={`Parcelas do pagamento ${index + 1}`}
+                              value={payment.installments}
+                              onChange={(e) =>
+                                fin(
+                                  "entrySchedule",
+                                  draft.finance.entrySchedule.map((step) =>
+                                    step.id === payment.id
+                                      ? {
+                                          ...step,
+                                          installments: Number(e.target.value),
+                                        }
+                                      : step,
+                                  ),
+                                )
+                              }
+                            >
+                              <option value={1}>À vista</option>
+                              {Array.from({ length: 35 }, (_, n) => n + 2).map(
+                                (n) => (
+                                  <option key={n} value={n}>
+                                    {n} vezes
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                        </div>
+                        {payment.amount !== null &&
+                          payment.installments > 1 && (
+                            <small>
+                              {money(payment.amount / payment.installments)} por
+                              mês
+                            </small>
+                          )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() =>
+                        fin("entrySchedule", [
+                          ...draft.finance.entrySchedule,
+                          {
+                            id: crypto.randomUUID(),
+                            amount: null,
+                            month: "",
+                            installments: 1,
+                          },
+                        ])
+                      }
+                    >
+                      <Plus size={16} /> Adicionar pagamento
+                    </button>
                   </div>
                 )}
                 <h3>Documentação</h3>

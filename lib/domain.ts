@@ -20,6 +20,17 @@ export const financeSchema = z.object({
   split: z.boolean(),
   entryMonth: month,
   installmentMonth: month.default(""),
+  entrySchedule: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        amount,
+        month,
+        installments: z.number().int().min(1).max(120),
+      }),
+    )
+    .max(24)
+    .default([]),
   payment: amount,
   paymentMonth: month,
   condo: amount,
@@ -146,6 +157,7 @@ export function newProperty(): Property {
       split: false,
       entryMonth: "",
       installmentMonth: "",
+      entrySchedule: [],
       payment: null,
       paymentMonth: "",
       condo: null,
@@ -207,6 +219,8 @@ export function documentation(p: Property): number | null {
 }
 export function entry(p: Property): number | null {
   const f = p.finance;
+  if (f.entrySchedule.length)
+    return sumKnown(f.entrySchedule.map((payment) => payment.amount));
   if (f.cashEntry !== null) return f.cashEntry;
   if ([p.price, f.financed, f.fgts, f.subsidy].some((v) => v === null))
     return null;
@@ -216,6 +230,19 @@ export function entryParts(p: Property) {
   const total = entry(p),
     f = p.finance;
   if (total === null) return { upfront: null, installments: null };
+  if (f.entrySchedule.length)
+    return {
+      upfront: f.entrySchedule.reduce(
+        (sum, payment) =>
+          sum + (payment.installments === 1 ? (payment.amount ?? 0) : 0),
+        0,
+      ),
+      installments: f.entrySchedule.reduce(
+        (sum, payment) =>
+          sum + (payment.installments > 1 ? (payment.amount ?? 0) : 0),
+        0,
+      ),
+    };
   if (!f.split) return { upfront: total, installments: 0 };
   const installments =
     f.installmentTotal ?? (f.deposit === null ? null : total - f.deposit);
@@ -292,9 +319,14 @@ export function validateFinance(p: Property) {
     return "Financiamento, FGTS e subsídio excedem o preço.";
   if (e !== null && f.deposit !== null && f.deposit > e)
     return "O sinal não pode exceder a entrada em dinheiro.";
-  if (e !== null && f.installmentTotal !== null && f.installmentTotal > e)
+  if (
+    !f.entrySchedule.length &&
+    e !== null &&
+    f.installmentTotal !== null &&
+    f.installmentTotal > e
+  )
     return "A parte parcelada não pode exceder a entrada em dinheiro.";
-  if (f.cashEntry !== null && p.price !== null && f.cashEntry > p.price)
+  if (e !== null && p.price !== null && e > p.price)
     return "A entrada informada não pode exceder o preço do imóvel.";
   if (
     f.constructionStart &&
@@ -324,18 +356,24 @@ export function cashflow(p: Property, start: string, count = 12) {
     doc = documentation(p);
   const pending: string[] = [];
   for (const [label, value, date] of [
-    ["Entrada", e, f.entryMonth],
+    ...(f.entrySchedule.length ? [] : [["Entrada", e, f.entryMonth]]),
     ["Prestação", f.payment, f.paymentMonth],
     ["Condomínio", f.condo, f.condoMonth],
     ["IPTU", f.iptu, f.iptuMonth || f.condoMonth],
     ["Documentação", doc, f.docMonth],
-  ] as const)
+  ] as [string, number | null, string][])
     if (value === null || (value > 0 && !date)) pending.push(label);
+  if (f.entrySchedule.length)
+    f.entrySchedule.forEach((payment, index) => {
+      if (payment.amount === null || (payment.amount > 0 && !payment.month))
+        pending.push(`Etapa ${index + 1} da entrada`);
+    });
   const parts = entryParts(p);
-  if (f.split && parts.installments === null)
+  if (!f.entrySchedule.length && f.split && parts.installments === null)
     pending.push("Parte parcelada da entrada");
   if (f.extras.some((x) => !x.month)) pending.push("Mês dos gastos eventuais");
   if (
+    p.type !== null &&
     p.type !== "Pronto" &&
     (f.construction === null ||
       (f.construction > 0 && (!f.constructionStart || !f.constructionEnd)))
@@ -348,11 +386,30 @@ export function cashflow(p: Property, start: string, count = 12) {
       const date = new Date(Math.floor(index / 12), index % 12, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const values = Array<number>(8).fill(0);
-      if (f.entryMonth && e !== null) {
-        const offset = index - monthIndex(f.entryMonth);
-        if (offset === 0) values[0] = parts.upfront ?? 0;
-        const installmentOffset =
-          index - monthIndex(f.installmentMonth || f.entryMonth);
+      if (f.entrySchedule.length) {
+        for (const payment of f.entrySchedule) {
+          if (!payment.month || payment.amount === null) continue;
+          const offset = index - monthIndex(payment.month);
+          if (payment.installments === 1 && offset === 0)
+            values[0] += payment.amount;
+          if (
+            payment.installments > 1 &&
+            offset >= 0 &&
+            offset < payment.installments
+          ) {
+            const cents = Math.round(payment.amount * 100);
+            const base = Math.floor(cents / payment.installments);
+            values[1] +=
+              (base + (offset < cents % payment.installments ? 1 : 0)) / 100;
+          }
+        }
+      } else if (e !== null) {
+        if (f.entryMonth && index === monthIndex(f.entryMonth))
+          values[0] = parts.upfront ?? 0;
+        const installmentStart = f.installmentMonth || f.entryMonth;
+        const installmentOffset = installmentStart
+          ? index - monthIndex(installmentStart)
+          : -1;
         if (
           f.split &&
           parts.installments !== null &&

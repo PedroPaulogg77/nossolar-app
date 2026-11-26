@@ -32,7 +32,7 @@ describe("orçamento da casa", () => {
       options: [
         {
           id: crypto.randomUUID(),
-          name: "Fogão Loja B",
+          name: "Fogão Loja A",
           price: 1300,
           store: "Loja B",
           url: "",

@@ -77,6 +77,8 @@ Referências: [RLS Supabase](https://supabase.com/docs/guides/database/postgres/
 
 Desconhecido é `null`, não zero. Entrada exige preço, financiamento, FGTS e subsídio explicitamente informados. Documentação detalhada substitui a estimativa de 6%. Os centavos das parcelas são distribuídos sem alterar o total. Sinal e primeira parcela podem ter meses diferentes; se o início das parcelas estiver vazio, usa-se o mês da entrada. Obra fixa usa os meses informados; série variável pode ser registrada como gastos eventuais identificados. Prestação não é calculada com taxas inventadas.
 
+Propostas com vários vencimentos podem ser detalhadas em etapas dentro de cada imóvel. Cada etapa tem valor, mês inicial e pagamento à vista ou em parcelas. O total da entrada vem da soma das etapas; imóveis antigos no formato simples continuam válidos. Finanças oferece três períodos consecutivos de 12 meses, e Mobília pode somar o imóvel escolhido às compras planejadas.
+
 “Para adquirir / entrar” reúne entrada em dinheiro e documentação; gastos eventuais aparecem separadamente no fluxo. Custo recorrente é prestação + condomínio + IPTU equivalente, não evolução de obra nem parcelas transitórias da entrada. Barras parciais são subtotais conhecidos e exibem pendências. A carta de crédito de R$ 400 mil não preenche financiamento nem promete elegibilidade.
 
 A avaliação possui cinco grupos: financeiro, localização, planta/acabamento, condomínio e riscos. Nota final só aparece com todos os grupos de peso positivo preenchidos. Pesos somam 100. Não há normalização que favoreça avaliações incompletas.

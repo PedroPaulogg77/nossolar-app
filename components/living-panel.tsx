@@ -616,12 +616,14 @@ function Photos({
 function Budget({
   data,
   properties,
+  selectedPropertyId,
   mode,
   onChange,
   saving,
 }: {
   data: Living;
   properties: Property[];
+  selectedPropertyId: string;
   mode: "Simulação" | "Comprado";
   onChange: (patch: Partial<Living>) => void;
   saving: boolean;
@@ -629,7 +631,13 @@ function Budget({
   const [start, setStart] = useState(
     new Date().toLocaleDateString("sv-SE").slice(0, 7),
   );
-  const [propertyId, setPropertyId] = useState("");
+  const [propertyId, setPropertyId] = useState(
+    selectedPropertyId || (properties.length === 1 ? properties[0].id : ""),
+  );
+  useEffect(() => {
+    if (!propertyId && (selectedPropertyId || properties.length === 1))
+      setPropertyId(selectedPropertyId || properties[0].id);
+  }, [propertyId, selectedPropertyId, properties]);
   const property = properties.find((p) => p.id === propertyId);
   const [limitDraft, setLimitDraft] = useState(String(data.monthlyLimit ?? ""));
   const monthCount = Math.max(
@@ -664,7 +672,7 @@ function Budget({
         </div>
         <div className="planning-settings">
           <label className="field">
-            <span>Somar um imóvel</span>
+            <span>Imóvel no planejamento</span>
             <select
               value={propertyId}
               onChange={(e) => setPropertyId(e.target.value)}
@@ -787,10 +795,12 @@ export function LivingPanel({
   area,
   store,
   properties,
+  selectedPropertyId,
 }: {
   area: "Mobília" | "Inspirações" | "Lista inicial";
   store: Store;
   properties: Property[];
+  selectedPropertyId: string;
 }) {
   const { data, loading, error, saving, save, reload } = store;
   const [mode, setMode] = useState<"Simulação" | "Comprado">("Simulação");
@@ -1364,6 +1374,7 @@ export function LivingPanel({
           <Budget
             data={data}
             properties={properties}
+            selectedPropertyId={selectedPropertyId}
             mode={mode}
             saving={saving}
             onChange={(patch) => void run({ ...data, ...patch })}

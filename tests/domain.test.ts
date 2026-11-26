@@ -15,6 +15,58 @@ import {
   recurring,
 } from "../lib/domain";
 describe("Integridade financeira", () => {
+  it("distribui a proposta de entrada em três etapas sem antecipar o pagamento final", () => {
+    const p = newProperty();
+    p.name = "Área privativa";
+    p.finance.entrySchedule = [
+      {
+        id: crypto.randomUUID(),
+        amount: 30000,
+        month: "2026-12",
+        installments: 1,
+      },
+      {
+        id: crypto.randomUUID(),
+        amount: 25000,
+        month: "2026-12",
+        installments: 12,
+      },
+      {
+        id: crypto.randomUUID(),
+        amount: 25000,
+        month: "2027-12",
+        installments: 1,
+      },
+    ];
+    expect(entry(p)).toBe(80000);
+    expect(cashflow(p, "2026-12").pending).not.toContain("Evolução de obra");
+    expect(entryParts(p)).toEqual({ upfront: 55000, installments: 25000 });
+    const months = cashflow(p, "2026-12", 13).months;
+    expect(months[0].values[0]).toBe(30000);
+    expect(months[0].values[1]).toBe(2083.34);
+    expect(months[11].values[1]).toBe(2083.33);
+    expect(months[12].values[0]).toBe(25000);
+    expect(
+      Math.round(
+        months.reduce(
+          (sum, month) => sum + month.values[0] + month.values[1],
+          0,
+        ) * 100,
+      ),
+    ).toBe(8000000);
+  });
+  it("abre imóveis salvos antes do cronograma de etapas", () => {
+    const oldProperty = newProperty();
+    oldProperty.name = "Imóvel salvo";
+    delete (oldProperty.finance as Partial<typeof oldProperty.finance>)
+      .entrySchedule;
+    const restored = backupSchema.parse({
+      version: 1,
+      properties: [oldProperty],
+      preferences: defaults,
+    });
+    expect(restored.properties[0].finance.entrySchedule).toEqual([]);
+  });
   it("aceita entrada informada e parcela só a parte escolhida", () => {
     const p = initialProperty();
     p.finance.cashEntry = 90000;
