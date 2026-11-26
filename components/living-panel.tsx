@@ -10,6 +10,8 @@ import {
   Trash2,
   RefreshCw,
   Heart,
+  Folder,
+  ArrowLeft,
 } from "lucide-react";
 import { Modal } from "./dialog";
 import { PinterestReference } from "./pinterest-reference";
@@ -948,6 +950,7 @@ export function LivingPanel({
   const refs = data.inspirations.filter(
     (r) => !collection || r.collectionId === collection,
   );
+  const selectedCollection = data.collections.find((c) => c.id === collection);
   return (
     <>
       <div className="page-heading">
@@ -957,11 +960,11 @@ export function LivingPanel({
               ? "Compras da casa"
               : area === "Lista inicial"
                 ? "Lista para a casa nova"
-                : "Ideias para o nosso lar"}
+                : "Inspirações"}
           </h1>
         </div>
         <div className="living-heading-actions">
-          {area !== "Lista inicial" && (
+          {area === "Mobília" && (
             <button
               className="text-button living-refresh"
               aria-label="Atualizar lista"
@@ -979,12 +982,12 @@ export function LivingPanel({
               onClick={() => {
                 setMessage("");
                 if (area === "Mobília") newItem();
-                else if (!data.collections.length)
+                else if (!collection)
                   setEditingCollection({ id: crypto.randomUUID(), name: "" });
                 else
                   setReference({
                     id: crypto.randomUUID(),
-                    collectionId: collection || data.collections[0].id,
+                    collectionId: collection,
                     title: "",
                     url: "",
                     notes: "",
@@ -994,7 +997,11 @@ export function LivingPanel({
               }}
             >
               <Plus size={18} />
-              {area === "Mobília" ? "Adicionar item" : "Adicionar referência"}
+              {area === "Mobília"
+                ? "Adicionar item"
+                : collection
+                  ? "Guardar inspiração"
+                  : "Nova coleção"}
             </button>
           )}
         </div>
@@ -1426,88 +1433,150 @@ export function LivingPanel({
         </section>
       ) : (
         <>
-          <div className="living-tabs">
-            <button
-              className={!collection ? "chip selected" : "chip"}
-              onClick={() => setCollection("")}
-            >
-              Todas
-            </button>
-            {data.collections.map((c) => (
-              <button
-                key={c.id}
-                className={collection === c.id ? "chip selected" : "chip"}
-                onClick={() => setCollection(c.id)}
-              >
-                {c.name}
-              </button>
-            ))}
-            <button
-              className="text-button"
-              onClick={() =>
-                setEditingCollection({ id: crypto.randomUUID(), name: "" })
-              }
-            >
-              <Plus size={14} /> Nova coleção
-            </button>
-            {collection && (
-              <button
-                className="text-button"
-                onClick={() =>
-                  setEditingCollection(
-                    data.collections.find((c) => c.id === collection)!,
-                  )
-                }
-              >
-                Editar coleção
-              </button>
-            )}
-          </div>
-          {!refs.length ? (
-            <div className="collection-empty">
-              <Images />
-              <h3>Ideias que merecem ficar por perto</h3>
-              <p>
-                Crie uma coleção como Sala ou Cozinha e guarde fotos ou links de
-                referência.
-              </p>
-            </div>
+          {!collection ? (
+            <section className="collection-home">
+              <header className="collection-home-heading">
+                <div>
+                  <span className="eyebrow">AMBIENTES E IDEIAS</span>
+                  <h2>Suas coleções</h2>
+                  <p>Pastas para guardar referências de cada canto da casa.</p>
+                </div>
+              </header>
+              {data.collections.length ? (
+                <div className="collection-folder-grid">
+                  {data.collections.map((entry) => {
+                    const saved = data.inspirations.filter(
+                      (reference) => reference.collectionId === entry.id,
+                    );
+                    const cover = saved.find(
+                      (reference) => reference.photos[0],
+                    );
+                    return (
+                      <button
+                        className="collection-folder"
+                        key={entry.id}
+                        onClick={() => setCollection(entry.id)}
+                      >
+                        <div className="collection-folder-cover">
+                          {cover ? (
+                            <AttachmentCover
+                              file={cover.photos[0]}
+                              name={cover.title || entry.name}
+                              fallback={<Folder size={32} />}
+                            />
+                          ) : (
+                            <Folder size={34} strokeWidth={1.5} />
+                          )}
+                          {saved.length > 0 && (
+                            <span>
+                              {saved.length} {saved.length === 1 ? "salvo" : "salvos"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="collection-folder-copy">
+                          <strong>{entry.name}</strong>
+                          <small>
+                            {saved.length}{" "}
+                            {saved.length === 1 ? "ideia" : "ideias"}
+                          </small>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="collection-empty collection-first">
+                  <Folder size={34} strokeWidth={1.5} />
+                  <h3>Crie a primeira pasta de ideias</h3>
+                  <p>
+                    Separe inspirações por ambiente, como Sala, Cozinha ou
+                    Quarto.
+                  </p>
+                  <button
+                    className="secondary"
+                    onClick={() =>
+                      setEditingCollection({
+                        id: crypto.randomUUID(),
+                        name: "",
+                      })
+                    }
+                  >
+                    <Plus size={16} /> Criar coleção
+                  </button>
+                </div>
+              )}
+            </section>
           ) : (
-            <div className="living-grid inspirations-grid">
-              {refs.map((r) => (
+            <section className="collection-detail">
+              <header className="collection-detail-heading">
                 <button
-                  className="living-card"
-                  key={r.id}
-                  onClick={() => {
-                    setMessage("");
-                    setReference(structuredClone(r));
-                  }}
+                  className="text-button collection-back"
+                  onClick={() => setCollection("")}
                 >
-                  <div className="living-cover">
-                    <AttachmentCover
-                      file={r.photos[0]}
-                      name={r.title || "Inspiração"}
-                      fallback={<Images size={32} />}
-                    />
-                  </div>
-                  <div className="living-card-body">
-                    <small>
-                      {
-                        data.collections.find((c) => c.id === r.collectionId)
-                          ?.name
-                      }
-                    </small>
-                    <h3>
-                      {r.title ||
-                        (r.url ? new URL(r.url).hostname : "Uma inspiração")}
-                    </h3>
-                    {r.itemId && (
-                      <p>{data.items.find((i) => i.id === r.itemId)?.name}</p>
-                    )}
-                  </div>
+                  <ArrowLeft size={16} /> Coleções
                 </button>
-              ))}
-            </div>
+                <div>
+                  <h2>{selectedCollection?.name}</h2>
+                  <p>
+                    {refs.length}{" "}
+                    {refs.length === 1 ? "ideia salva" : "ideias salvas"}
+                  </p>
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    selectedCollection &&
+                    setEditingCollection({ ...selectedCollection })
+                  }
+                >
+                  Editar pasta
+                </button>
+              </header>
+              {!refs.length ? (
+                <div className="collection-empty collection-first">
+                  <Images size={32} />
+                  <h3>Esta pasta está pronta para receber ideias</h3>
+                  <p>
+                    Guarde uma foto, um link ou uma referência para este
+                    ambiente.
+                  </p>
+                </div>
+              ) : (
+                <div className="living-grid inspirations-grid">
+                  {refs.map((r) => (
+                    <button
+                      className="living-card"
+                      key={r.id}
+                      onClick={() => {
+                        setMessage("");
+                        setReference(structuredClone(r));
+                      }}
+                    >
+                      <div className="living-cover">
+                        <AttachmentCover
+                          file={r.photos[0]}
+                          name={r.title || "Inspiração"}
+                          fallback={<Images size={32} />}
+                        />
+                      </div>
+                      <div className="living-card-body">
+                        <h3>
+                          {r.title ||
+                            (r.url
+                              ? new URL(r.url).hostname
+                              : "Uma inspiração")}
+                        </h3>
+                        {r.itemId && (
+                          <p>
+                            {data.items.find((i) => i.id === r.itemId)?.name}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
           )}
         </>
       )}

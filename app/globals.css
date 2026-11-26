@@ -2385,6 +2385,24 @@ input[type="checkbox"] {
 .inspirations-grid .living-cover {
   height: 260px;
 }
+.collection-home { max-width:1180px; }
+.collection-home-heading { margin:12px 0 22px; }
+.collection-home-heading h2 { margin:7px 0 5px; font-size:24px; font-weight:500; letter-spacing:-.03em; }
+.collection-home-heading p,.collection-detail-heading p { margin:0; color:var(--muted); font-size:13px; }
+.collection-folder-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:18px; }
+.collection-folder { display:block; overflow:hidden; padding:0; text-align:left; background:white; color:var(--ink); border:1px solid var(--line); border-radius:12px; cursor:pointer; transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease; }
+.collection-folder:hover { transform:translateY(-2px); border-color:#7a9c8e; box-shadow:0 6px 20px #183d2810; }
+.collection-folder-cover { height:142px; display:grid; place-items:center; position:relative; overflow:hidden; color:#6f8d81; background:#eaf0e9; }
+.collection-folder-cover img { width:100%; height:100%; object-fit:cover; }
+.collection-folder-cover>span { position:absolute; right:9px; bottom:9px; padding:4px 7px; color:white; background:#173c2edb; border-radius:20px; font-size:10px; }
+.collection-folder-copy { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; }
+.collection-folder-copy strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:550; }
+.collection-folder-copy small { flex-shrink:0; color:var(--muted); font-size:11px; }
+.collection-detail-heading { display:grid; grid-template-columns:1fr auto; gap:10px 20px; align-items:center; margin:8px 0 22px; }
+.collection-detail-heading .collection-back { grid-column:1/-1; justify-self:start; }
+.collection-detail-heading>div h2 { margin:0 0 4px; font-size:24px; font-weight:500; letter-spacing:-.03em; }
+.collection-first { padding:44px 24px; }
+.collection-first .secondary { display:inline-flex; align-items:center; gap:7px; }
 .living-budget {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2529,7 +2547,7 @@ input[type="checkbox"] {
     height: 150px;
   }
   .inspirations-grid .living-cover {
-    height: 190px;
+    height: 210px;
   }
   .living-card-body {
     padding: 12px;
@@ -2564,6 +2582,10 @@ input[type="checkbox"] {
   .property-tabs {
     margin-bottom: 22px;
   }
+  .collection-folder-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .collection-folder-cover { height:120px; }
+  .collection-folder-copy { align-items:flex-start; flex-direction:column; gap:3px; padding:10px 11px; }
+  .collection-detail-heading>div h2 { font-size:21px; }
 }
 .living-cover { overflow:hidden; min-height:0; position:relative; }
 .living-cover img { display:block; min-height:0; max-height:100%; }

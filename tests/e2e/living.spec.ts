@@ -126,7 +126,12 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
       .click();
     await page.getByText(`Editar modelo ${index}`).click();
     await page.getByLabel(`Modelo da opção ${index}`).fill(`Modelo ${index}`);
-    await page.getByLabel(`Preço da opção ${index}`).fill(String(price));
+    await page
+      .getByLabel(`Preço no Pix da opção ${index} (R$)`)
+      .fill(String(price));
+    await page
+      .getByLabel(`Preço no cartão da opção ${index} (R$)`)
+      .fill(String(price));
     await page
       .getByText("Loja, link e foto")
       .nth(index - 1)
@@ -180,10 +185,13 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1080 });
   await page.getByRole("button", { name: "Inspirações", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Suas coleções" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Nova coleção" }).click();
   await page.getByLabel("Nome da coleção").fill("Sala");
   await page.getByRole("button", { name: "Salvar coleção" }).click();
-  await page.getByRole("button", { name: "Adicionar referência" }).click();
+  await page.getByRole("button", { name: "Guardar inspiração" }).click();
   await page.getByLabel("Título da inspiração").fill("Luz natural");
   await page
     .getByLabel("Link de referência ou Pinterest")
@@ -194,20 +202,29 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
     page.getByRole("img", { name: "Foto de sala.jpg" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Salvar inspiração" }).click();
+  await page.getByRole("button", { name: "Coleções" }).click();
+  await page.screenshot({
+    path: "test-results/inspirations-folders-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/inspirations-folders-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1080 });
   await page.getByRole("button", { name: "Nova coleção" }).click();
   await page.getByLabel("Nome da coleção").fill("Quarto");
   await page.getByRole("button", { name: "Salvar coleção" }).click();
-  await page.getByRole("button", { name: "Todas", exact: true }).click();
+  await page.getByRole("button", { name: "Coleções" }).click();
+  await page.getByRole("button", { name: /Sala/ }).click();
   await page.getByRole("heading", { name: "Luz natural" }).click();
   await page
     .getByRole("combobox", { name: "Coleção", exact: true })
     .selectOption({ label: "Quarto" });
   await page.getByRole("button", { name: "Salvar inspiração" }).click();
-  await page.getByRole("button", { name: "Sala", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Luz natural" })).toHaveCount(
-    0,
-  );
-  await page.getByRole("button", { name: "Quarto", exact: true }).click();
+  await page.getByRole("button", { name: "Coleções" }).click();
+  await page.getByRole("button", { name: /Quarto/ }).click();
   await expect(
     page.getByRole("heading", { name: "Luz natural" }),
   ).toBeVisible();
@@ -223,6 +240,7 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   ).toBe(true);
   await page.reload();
   await page.getByRole("button", { name: "Inspirações", exact: true }).click();
+  await page.getByRole("button", { name: /Quarto/ }).click();
   await expect(
     page.getByRole("heading", { name: "Luz natural" }),
   ).toBeVisible();
