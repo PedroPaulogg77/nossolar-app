@@ -47,6 +47,9 @@ export const optionSchema = z.object({
   store: z.string().max(200),
   url: linkSchema,
   price,
+  pixPrice: price.optional(),
+  cardPrice: price.optional(),
+  cardInstallments: z.number().int().min(1).max(24).optional(),
   photos,
   model: z.string().max(100).optional(),
   notes: z.string().max(2000).optional(),
@@ -171,8 +174,11 @@ export const newPurchase = (): Purchase => ({
   firstMonth: "",
 });
 export function itemTotal(item: Purchase): number | null {
-  const unit = item.selected
-    ? (item.options.find((o) => o.id === item.selected)?.price ?? null)
+  const chosen = item.options.find((o) => o.id === item.selected);
+  const unit = chosen
+    ? chosen.payment === "Parcelado"
+      ? (chosen.cardPrice ?? chosen.price)
+      : (chosen.pixPrice ?? chosen.price)
     : item.estimate;
   return unit === null ? null : Math.round(unit * item.quantity * 100) / 100;
 }

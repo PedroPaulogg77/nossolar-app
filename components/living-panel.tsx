@@ -35,6 +35,219 @@ import { supabase } from "@/lib/supabase";
 import type { Attachment } from "@/lib/attachment-types";
 type Store = ReturnType<typeof useLiving>;
 const DRAFT_KEY = "nosso-lar-shopping-draft-v1";
+const CHECKLIST_KEY = "nosso-lar-moving-checklist-v1";
+const STARTER_LIST: {
+  room: string;
+  group: Purchase["group"];
+  items: string[];
+}[] = [
+  {
+    room: "Entrada",
+    group: "Outros",
+    items: [
+      "Fechadura ou troca de segredo",
+      "Capacho",
+      "Sapateira",
+      "Cabideiro",
+      "Luminária de entrada",
+      "Porta-chaves",
+    ],
+  },
+  {
+    room: "Sala",
+    group: "Móveis e eletrodomésticos",
+    items: [
+      "Sofá",
+      "Rack ou painel",
+      "Mesa de centro",
+      "Mesa lateral",
+      "Poltrona",
+      "Estante",
+      "Cortina",
+      "Tapete",
+      "Luminária",
+      "TV",
+    ],
+  },
+  {
+    room: "Sala",
+    group: "Decoração e iluminação",
+    items: [
+      "Lâmpadas",
+      "Abajur",
+      "Almofadas",
+      "Quadros",
+      "Espelho",
+      "Vasos",
+      "Manta",
+      "Relógio de parede",
+    ],
+  },
+  {
+    room: "Cozinha",
+    group: "Eletrodomésticos",
+    items: [
+      "Geladeira",
+      "Fogão ou cooktop",
+      "Forno",
+      "Micro-ondas",
+      "Depurador ou coifa",
+      "Liquidificador",
+      "Sanduicheira",
+      "Cafeteira",
+      "Air fryer",
+      "Filtro de água",
+    ],
+  },
+  {
+    room: "Cozinha",
+    group: "Móveis e eletrodomésticos",
+    items: [
+      "Mesa de jantar",
+      "Cadeiras",
+      "Armário ou solução de cozinha",
+      "Bancada ou carrinho",
+      "Banquetas",
+      "Lixeira",
+    ],
+  },
+  {
+    room: "Cozinha",
+    group: "Utensílios",
+    items: [
+      "Jogo de panelas",
+      "Frigideira",
+      "Panela de pressão",
+      "Assadeira",
+      "Forma",
+      "Facas",
+      "Tábua de corte",
+      "Escorredor de louça",
+      "Potes para alimentos",
+      "Pratos",
+      "Copos",
+      "Canecas",
+      "Talheres",
+      "Concha e espátula",
+      "Abridor de latas",
+      "Ralador",
+      "Peneira",
+      "Jarra",
+      "Garrafa térmica",
+      "Panos de prato",
+      "Luva térmica",
+      "Lixeira e sacos",
+    ],
+  },
+  {
+    room: "Quarto",
+    group: "Móveis e eletrodomésticos",
+    items: [
+      "Cama",
+      "Colchão",
+      "Guarda-roupa",
+      "Criados-mudos",
+      "Cômoda",
+      "Cortina",
+      "Espelho",
+      "Ventilador",
+    ],
+  },
+  {
+    room: "Quarto",
+    group: "Enxoval",
+    items: [
+      "Travesseiros",
+      "Protetor de colchão",
+      "Jogo de lençol",
+      "Cobertor",
+      "Edredom",
+      "Colcha",
+      "Cabides",
+      "Cesto de roupa",
+      "Luminária de cabeceira",
+    ],
+  },
+  {
+    room: "Banheiro",
+    group: "Móveis e eletrodomésticos",
+    items: [
+      "Chuveiro (se não houver)",
+      "Gabinete ou armário",
+      "Espelho",
+      "Lixeira",
+      "Suporte de toalha",
+    ],
+  },
+  {
+    room: "Banheiro",
+    group: "Enxoval",
+    items: [
+      "Toalhas de banho",
+      "Toalhas de rosto",
+      "Tapete de banheiro",
+      "Cortina de box (se necessário)",
+      "Porta-sabonete",
+      "Porta-escovas",
+      "Escova sanitária",
+      "Desentupidor",
+    ],
+  },
+  {
+    room: "Lavanderia",
+    group: "Eletrodomésticos",
+    items: [
+      "Máquina de lavar",
+      "Varal",
+      "Ferro de passar",
+      "Tábua de passar",
+      "Aspirador de pó",
+      "Vassoura",
+      "Rodo",
+      "Balde",
+      "Pá de lixo",
+      "Mop",
+    ],
+  },
+  {
+    room: "Lavanderia",
+    group: "Organização e limpeza",
+    items: [
+      "Cesto de roupa",
+      "Pregadores",
+      "Cesto de produtos",
+      "Lixeira",
+      "Panos de chão",
+      "Esponjas",
+      "Detergente",
+      "Desinfetante",
+      "Sabão para roupas",
+      "Amaciante",
+      "Água sanitária",
+      "Luvas de limpeza",
+    ],
+  },
+  {
+    room: "Geral",
+    group: "Organização e limpeza",
+    items: [
+      "Lâmpadas extras",
+      "Extensão",
+      "Filtro de linha",
+      "Fita isolante",
+      "Fita veda-rosca",
+      "Kit de ferramentas",
+      "Furadeira",
+      "Escada doméstica",
+      "Caixa organizadora",
+      "Caixa de primeiros socorros",
+      "Kit de costura",
+      "Pilhas",
+      "Carregadores",
+      "Lixeira e sacos de lixo",
+    ],
+  },
+];
 const moments = [
   "Antes das chaves",
   "Na mudança",
@@ -400,6 +613,25 @@ export function LivingPanel({
 }) {
   const { data, loading, error, saving, save, reload } = store;
   const [mode, setMode] = useState<"Simulação" | "Comprado">("Simulação");
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklist, setChecklist] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      setChecklist(JSON.parse(localStorage.getItem(CHECKLIST_KEY) ?? "[]"));
+    } catch {
+      setChecklist([]);
+    }
+  }, []);
+  const toggleChecklist = (key: string) =>
+    setChecklist((current) => {
+      const next = current.includes(key)
+        ? current.filter((x) => x !== key)
+        : [...current, key];
+      try {
+        localStorage.setItem(CHECKLIST_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   const [group, setGroup] = useState(""),
     [room, setRoom] = useState(""),
     [search, setSearch] = useState("");
@@ -654,6 +886,66 @@ export function LivingPanel({
               )}
             </strong>
           </div>
+          <details
+            className="starter-checklist"
+            open={checklistOpen}
+            onToggle={(e) => setChecklistOpen(e.currentTarget.open)}
+          >
+            <summary>
+              Checklist da casa <small>· sugestões fora da simulação</small>
+            </summary>
+            <div className="starter-groups">
+              {STARTER_LIST.map((section) => (
+                <section key={section.room + section.group}>
+                  <h3>
+                    {section.room} <small>{section.group}</small>
+                  </h3>
+                  {section.items.map((name) => {
+                    const key = `${section.room}|${name}`;
+                    const included = data.items.some(
+                      (i) =>
+                        i.room === section.room &&
+                        i.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+                    );
+                    return (
+                      <label className="starter-item" key={key}>
+                        <input
+                          type="checkbox"
+                          checked={checklist.includes(key) || included}
+                          disabled={included}
+                          onChange={() => toggleChecklist(key)}
+                        />
+                        <span>{name}</span>
+                        {!included && checklist.includes(key) && (
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const item = {
+                                ...newPurchase(),
+                                name,
+                                room: section.room,
+                                group: section.group,
+                                firstMonth: data.moveMonth,
+                              };
+                              void run({
+                                ...data,
+                                items: [...data.items, item],
+                              });
+                            }}
+                          >
+                            Adicionar
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </section>
+              ))}
+            </div>
+          </details>
           <details className="living-extra-filters">
             <summary>Buscar</summary>
             <div className="living-filters">
@@ -712,7 +1004,41 @@ export function LivingPanel({
                 const option = i.options.find((o) => o.id === i.selected);
                 return (
                   <div className="shopping-row" key={i.id}>
-                    <div className="shopping-thumb">
+                    <div
+                      className="shopping-thumb"
+                      tabIndex={0}
+                      title="Passe o mouse e cole uma foto com Ctrl+V"
+                      onPaste={async (e) => {
+                        const image = [...e.clipboardData.items]
+                          .find((x) => x.type.startsWith("image/"))
+                          ?.getAsFile();
+                        if (!image) return;
+                        e.preventDefault();
+                        try {
+                          const photo = await saveLivingPhoto(
+                            new File([image], `foto-${i.name}.png`, {
+                              type: image.type,
+                            }),
+                          );
+                          const next = {
+                            ...data,
+                            items: data.items.map((x) =>
+                              x.id === i.id
+                                ? { ...x, photos: [...x.photos, photo] }
+                                : x,
+                            ),
+                          };
+                          await save(next);
+                        } catch (err) {
+                          setMessage(
+                            err instanceof Error
+                              ? err.message
+                              : "Não foi possível colar a foto.",
+                          );
+                        }
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.focus()}
+                    >
                       <AttachmentCover
                         file={option?.photos[0] || i.photos[0]}
                         name={i.name}
@@ -1244,10 +1570,21 @@ export function LivingPanel({
                               onChange={(name) => update({ name })}
                             />
                             <Input
-                              label={`Preço da opção ${index + 1} (R$)`}
+                              label={`Preço no Pix da opção ${index + 1} (R$)`}
                               type="number"
-                              value={o.price}
-                              onChange={(v) => update({ price: number(v) })}
+                              value={o.pixPrice ?? o.price}
+                              onChange={(v) =>
+                                update({
+                                  pixPrice: number(v),
+                                  price: number(v),
+                                })
+                              }
+                            />
+                            <Input
+                              label={`Preço no cartão da opção ${index + 1} (R$)`}
+                              type="number"
+                              value={o.cardPrice ?? o.price}
+                              onChange={(v) => update({ cardPrice: number(v) })}
                             />
                           </div>
                           <div className="form-grid">
