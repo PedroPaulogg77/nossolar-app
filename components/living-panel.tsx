@@ -1,4 +1,6 @@
 "use client";
+import { CurrencyInput } from "@/components/currency-input";
+import { parseLocalizedNumber } from "@/lib/localized-number";
 import { useEffect, useState } from "react";
 import {
   Plus,
@@ -23,6 +25,7 @@ import {
   rooms,
   itemTotal,
   newPurchase,
+  mergeDuplicatePurchase,
   purchasesFlow,
   livingSchema,
   type Purchase,
@@ -462,7 +465,7 @@ const momentForMonth = (month: string, moveMonth: string): Moment =>
     : month === moveMonth
       ? "Na mudança"
       : "Depois da mudança";
-const number = (s: string) => (s === "" ? null : Number(s));
+const number = (s: string) => parseLocalizedNumber(s) ?? null;
 function Input({
   label,
   value,
@@ -479,14 +482,24 @@ function Input({
   return (
     <label className="field">
       <span>{label}</span>
-      <input
-        required={required}
-        type={type}
-        min={type === "number" ? 0 : undefined}
-        step={type === "number" ? "any" : undefined}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      {type === "currency" ? (
+        <CurrencyInput
+          value={
+            typeof value === "number" ? value : number(String(value ?? ""))
+          }
+          onChange={(v) => onChange(v === null ? "" : String(v))}
+          placeholder="0,00"
+        />
+      ) : (
+        <input
+          required={required}
+          type={type}
+          min={type === "number" ? 0 : undefined}
+          step={type === "number" ? "any" : undefined}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
     </label>
   );
 }
@@ -684,14 +697,11 @@ function Budget({
           {data.limitEnabled && (
             <label className="field">
               <span>Limite por mês (R$)</span>
-              <input
-                type="number"
-                min="0"
-                value={limitDraft}
-                onChange={(e) => setLimitDraft(e.target.value)}
-                onBlur={() => {
-                  if (number(limitDraft) !== data.monthlyLimit)
-                    onChange({ monthlyLimit: number(limitDraft) });
+              <CurrencyInput
+                value={number(limitDraft)}
+                onChange={(v) => setLimitDraft(v === null ? "" : String(v))}
+                onBlur={(v) => {
+                  if (v !== data.monthlyLimit) onChange({ monthlyLimit: v });
                 }}
               />
             </label>
@@ -886,6 +896,8 @@ export function LivingPanel({
                   notes: p.notes,
                   url: sourceUrl.trim(),
                   photos: [],
+                  payment: "À vista",
+                  installments: 1,
                 },
               ],
               selected: current.selected ?? id,
@@ -1240,6 +1252,61 @@ export function LivingPanel({
                         ))}
                       </select>
                     </label>
+                    <label className="shopping-payment">
+                      <span>Pagamento</span>
+                      <select
+                        aria-label={`Pagamento de ${i.name}`}
+                        value={
+                          (option?.payment || i.payment) === "Parcelado"
+                            ? `installment-${option?.installments || i.installments}`
+                            : "cash"
+                        }
+                        disabled={saving}
+                        onChange={(e) => {
+                          const installments = Number(
+                            e.target.value.replace("installment-", ""),
+                          );
+                          const payment: Purchase["payment"] =
+                            e.target.value === "cash" ? "À vista" : "Parcelado";
+                          void run({
+                            ...data,
+                            items: data.items.map((x) =>
+                              x.id === i.id
+                                ? {
+                                    ...x,
+                                    payment,
+                                    installments:
+                                      payment === "Parcelado"
+                                        ? installments
+                                        : x.installments,
+                                    options: x.options.map((o) =>
+                                      o.id === x.selected
+                                        ? {
+                                            ...o,
+                                            payment,
+                                            installments:
+                                              payment === "Parcelado"
+                                                ? installments
+                                                : o.installments,
+                                          }
+                                        : o,
+                                    ),
+                                  }
+                                : x,
+                            ),
+                          });
+                        }}
+                      >
+                        <option value="cash">À vista</option>
+                        {Array.from({ length: 11 }, (_, n) => n + 2).map(
+                          (n) => (
+                            <option key={n} value={`installment-${n}`}>
+                              {n}x no cartão
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </label>
                     <label className="shopping-when">
                       <span>Comprar em</span>
                       <input
@@ -1279,11 +1346,6 @@ export function LivingPanel({
                       {itemTotal(i) === null
                         ? "Sem preço"
                         : money(itemTotal(i))}
-                      <small>
-                        {(option?.payment || i.payment) === "Parcelado"
-                          ? `${option?.installments || i.installments}x`
-                          : "À vista"}
-                      </small>
                     </div>
                     <button
                       className="shopping-edit"
@@ -1469,7 +1531,8 @@ export function LivingPanel({
                           )}
                           {saved.length > 0 && (
                             <span>
-                              {saved.length} {saved.length === 1 ? "salvo" : "salvos"}
+                              {saved.length}{" "}
+                              {saved.length === 1 ? "salvo" : "salvos"}
                             </span>
                           )}
                         </div>
@@ -1589,16 +1652,38 @@ export function LivingPanel({
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              const existing = data.items.find(
+                (candidate) =>
+                  !data.items.some((stored) => stored.id === item.id) &&
+                  mergeDuplicatePurchase(candidate, item) !== null,
+              );
+              const savedItem = existing
+                ? mergeDuplicatePurchase(existing, item)!
+                : item;
               void run(
                 {
                   ...data,
                   items: data.items.some((i) => i.id === item.id)
-                    ? data.items.map((i) => (i.id === item.id ? item : i))
-                    : [...data.items, item],
+                    ? data.items.map((i) =>
+                        i.id === item.id
+                          ? item
+                          : i.id === existing?.id
+                            ? savedItem
+                            : i,
+                      )
+                    : existing
+                      ? data.items.map((i) =>
+                          i.id === existing.id ? savedItem : i,
+                        )
+                      : [...data.items, item],
                 },
                 () => {
                   localStorage.removeItem(DRAFT_KEY);
                   setItem(null);
+                  if (existing)
+                    setMessage(
+                      "Esse item já estava na lista. As novas opções foram reunidas nele.",
+                    );
                 },
               );
             }}
@@ -1660,10 +1745,10 @@ export function LivingPanel({
               ) : (
                 <button
                   type="button"
-                  className="text-button"
+                  className="secondary"
                   onClick={() => setImportOpen(true)}
                 >
-                  Tenho um link ou texto para preencher com IA
+                  <Plus size={16} /> Adicionar opção com IA
                 </button>
               )}
               {!importOpen && (
@@ -1687,7 +1772,7 @@ export function LivingPanel({
                     {!item.selected && (
                       <Input
                         label="Estimativa por unidade (R$)"
-                        type="number"
+                        type="currency"
                         value={item.estimate}
                         onChange={(v) =>
                           setItem({ ...item, estimate: number(v) })
@@ -1749,54 +1834,6 @@ export function LivingPanel({
                       }}
                     />
                   </div>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Pagamento</span>
-                      <select
-                        value={
-                          item.options.find((o) => o.id === item.selected)
-                            ?.payment || item.payment
-                        }
-                        onChange={(e) => {
-                          const payment = e.target.value as Purchase["payment"];
-                          setItem({
-                            ...item,
-                            payment,
-                            options: item.options.map((o) =>
-                              o.id === item.selected ? { ...o, payment } : o,
-                            ),
-                          });
-                        }}
-                      >
-                        <option>À vista</option>
-                        <option>Parcelado</option>
-                      </select>
-                    </label>
-                    {(item.options.find((o) => o.id === item.selected)
-                      ?.payment || item.payment) === "Parcelado" && (
-                      <Input
-                        label="Número de parcelas"
-                        type="number"
-                        value={
-                          item.options.find((o) => o.id === item.selected)
-                            ?.installments || item.installments
-                        }
-                        onChange={(v) => {
-                          const installments = Number(v);
-                          setItem({
-                            ...item,
-                            installments,
-                            options: item.options.map((o) =>
-                              o.id === item.selected
-                                ? { ...o, installments }
-                                : o,
-                            ),
-                          });
-                        }}
-                      />
-                    )}
-                  </div>
-
                   <h3>Modelos que estamos considerando</h3>
                   {item.options.length > 0 && (
                     <div className="option-compare">
@@ -1856,6 +1893,45 @@ export function LivingPanel({
                         <fieldset className="living-option">
                           <legend>Opção {index + 1}</legend>
                           <div className="form-grid">
+                            <label className="field">
+                              <span>Forma de pagamento deste modelo</span>
+                              <select
+                                value={o.payment || item.payment}
+                                onChange={(e) =>
+                                  update({
+                                    payment: e.target
+                                      .value as Purchase["payment"],
+                                  })
+                                }
+                              >
+                                <option>À vista</option>
+                                <option>Parcelado</option>
+                              </select>
+                            </label>
+                            {(o.payment || item.payment) === "Parcelado" && (
+                              <label className="field">
+                                <span>Parcelas deste modelo</span>
+                                <select
+                                  value={o.installments || item.installments}
+                                  onChange={(e) =>
+                                    update({
+                                      installments: Number(e.target.value),
+                                    })
+                                  }
+                                >
+                                  {Array.from(
+                                    { length: 11 },
+                                    (_, n) => n + 2,
+                                  ).map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}x sem juros
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
+                          </div>
+                          <div className="form-grid">
                             <Input
                               required
                               label={`Modelo da opção ${index + 1}`}
@@ -1864,7 +1940,7 @@ export function LivingPanel({
                             />
                             <Input
                               label={`Preço no Pix da opção ${index + 1} (R$)`}
-                              type="number"
+                              type="currency"
                               value={o.pixPrice ?? o.price}
                               onChange={(v) =>
                                 update({
@@ -1875,7 +1951,7 @@ export function LivingPanel({
                             />
                             <Input
                               label={`Preço no cartão da opção ${index + 1} (R$)`}
-                              type="number"
+                              type="currency"
                               value={o.cardPrice ?? o.price}
                               onChange={(v) => update({ cardPrice: number(v) })}
                             />
@@ -1962,6 +2038,8 @@ export function LivingPanel({
                             url: "",
                             price: null,
                             photos: [],
+                            payment: "À vista",
+                            installments: 1,
                           },
                         ],
                       })

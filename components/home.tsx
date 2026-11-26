@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { CurrencyInput } from "@/components/currency-input";
+import { parseLocalizedNumber } from "@/lib/localized-number";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -190,6 +192,19 @@ function Field({
       </div>
     );
   }
+  if (type === "currency") {
+    const raw = String(value ?? "");
+    return (
+      <label className="field">
+        <span>{label}</span>
+        <CurrencyInput
+          value={parseLocalizedNumber(raw) ?? null}
+          onChange={(v) => onChange(v === null ? "" : String(v))}
+          placeholder="0,00"
+        />
+      </label>
+    );
+  }
   return (
     <label className="field">
       <span>{label}</span>
@@ -357,7 +372,7 @@ export default function Home({
     setDraft((p) =>
       p ? { ...p, finance: { ...p.finance, [key]: value } } : p,
     );
-  const number = (v: string) => (v === "" ? null : Number(v));
+  const number = (v: string) => parseLocalizedNumber(v) ?? null;
   const exportData = async () => {
     try {
       const files = await packFiles(properties);
@@ -1115,7 +1130,7 @@ export default function Home({
                           </div>
                           <Field
                             label="Valor disponível hoje (R$)"
-                            type="number"
+                            type="currency"
                             value={prefs.savings}
                             onChange={(v) => {
                               const updated = { ...prefs, savings: number(v) };
@@ -1379,7 +1394,7 @@ export default function Home({
                   </label>
                   <Field
                     label="Preço anunciado (R$)"
-                    type="number"
+                    type="currency"
                     value={draft.price}
                     onChange={(v) => update("price", number(v))}
                   />
@@ -1637,7 +1652,7 @@ export default function Home({
                 <div className="form-grid">
                   <Field
                     label="Entrada em dinheiro (R$)"
-                    type="number"
+                    type="currency"
                     value={draft.finance.cashEntry}
                     onChange={(v) => fin("cashEntry", number(v))}
                   />
@@ -1650,7 +1665,7 @@ export default function Home({
                     <Field
                       key={key}
                       label={label}
-                      type="number"
+                      type="currency"
                       value={draft.finance[key]}
                       onChange={(v) => fin(key, number(v))}
                     />
@@ -1685,7 +1700,7 @@ export default function Home({
                   <div className="form-grid">
                     <Field
                       label="Parte da entrada a parcelar"
-                      type="number"
+                      type="currency"
                       value={draft.finance.installmentTotal}
                       onChange={(v) => fin("installmentTotal", number(v))}
                     />
@@ -1732,7 +1747,7 @@ export default function Home({
                       <Field
                         key={k}
                         label={l}
-                        type="number"
+                        type="currency"
                         value={draft.finance[k]}
                         onChange={(v) => fin(k, number(v))}
                       />
@@ -1742,7 +1757,7 @@ export default function Home({
                 {draft.finance.docMode === "total" && (
                   <Field
                     label="Total da documentação"
-                    type="number"
+                    type="currency"
                     value={draft.finance.docTotal}
                     onChange={(v) => fin("docTotal", number(v))}
                   />
@@ -1772,13 +1787,13 @@ export default function Home({
                   <div className="form-grid">
                     <Field
                       label="Condomínio mensal"
-                      type="number"
+                      type="currency"
                       value={draft.finance.condo}
                       onChange={(v) => fin("condo", number(v))}
                     />
                     <Field
                       label="IPTU anual (dividido por 12 no planejamento)"
-                      type="number"
+                      type="currency"
                       value={draft.finance.iptu}
                       onChange={(v) => fin("iptu", number(v))}
                     />
@@ -1808,7 +1823,7 @@ export default function Home({
                     <div className="form-grid">
                       <Field
                         label="Valor mensal informado"
-                        type="number"
+                        type="currency"
                         value={draft.finance.construction}
                         onChange={(v) => fin("construction", number(v))}
                       />
@@ -1845,13 +1860,13 @@ export default function Home({
                       />
                       <Field
                         label="Valor"
-                        type="number"
+                        type="currency"
                         value={x.value}
                         onChange={(v) =>
                           fin(
                             "extras",
                             draft.finance.extras.map((a, j) =>
-                              j === i ? { ...a, value: Number(v) } : a,
+                              j === i ? { ...a, value: number(v) ?? 0 } : a,
                             ),
                           )
                         }
@@ -1942,18 +1957,18 @@ export default function Home({
             <div className="form-grid">
               <Field
                 label="Renda familiar bruta mensal"
-                type="number"
+                type="currency"
                 value={tempPrefs.income}
                 onChange={(v) =>
-                  setTempPrefs({ ...tempPrefs, income: Number(v) })
+                  setTempPrefs({ ...tempPrefs, income: number(v) ?? 0 })
                 }
               />
               <Field
                 label="Teto do preço do imóvel"
-                type="number"
+                type="currency"
                 value={tempPrefs.ceiling}
                 onChange={(v) =>
-                  setTempPrefs({ ...tempPrefs, ceiling: Number(v) })
+                  setTempPrefs({ ...tempPrefs, ceiling: number(v) ?? 0 })
                 }
               />
               <Field

@@ -102,7 +102,7 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   await page.getByRole("button", { name: "Não tenho link" }).click();
   await page.getByLabel("Nome do item", { exact: true }).fill("Sofá");
   await page.getByLabel("Quantidade", { exact: true }).fill("2");
-  await page.getByLabel("Estimativa por unidade").fill("90");
+  await page.getByLabel("Estimativa por unidade").fill("3.299,90");
   await page.getByText("Foto do item").click();
   await page.evaluate((encoded) => {
     const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
@@ -133,6 +133,14 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
       .getByLabel(`Preço no cartão da opção ${index} (R$)`)
       .fill(String(price));
     await page
+      .getByLabel("Forma de pagamento deste modelo")
+      .last()
+      .selectOption("Parcelado");
+    await page
+      .getByLabel("Parcelas deste modelo")
+      .last()
+      .selectOption(index === 1 ? "8" : "12");
+    await page
       .getByText("Loja, link e foto")
       .nth(index - 1)
       .click();
@@ -141,11 +149,6 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
       .fill(`https://example.com/produto-${index}`);
   }
   await page.locator(".option-choice input[type=radio]").nth(1).check();
-  await page
-    .getByLabel("Pagamento", { exact: false })
-    .first()
-    .selectOption("Parcelado");
-  await page.getByLabel("Número de parcelas").fill("3");
   await page.getByLabel("Mês da compra").fill("2026-12");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
@@ -156,6 +159,10 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   await page.getByRole("button", { name: "Salvar item", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".shopping-price")).toContainText("R$ 300,00");
+  expect(saved.items[0].estimate).toBe(3299.9);
+  expect(saved.items[0].options.map((option) => option.installments)).toEqual([
+    8, 12,
+  ]);
   await page.reload();
   await page.getByRole("button", { name: "Mobília", exact: true }).click();
   await expect(
@@ -169,6 +176,46 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
     .getByRole("combobox", { name: "Opção de Sofá" })
     .selectOption({ label: "Modelo 2 · R$ 150,00" });
   await expect(page.locator(".shopping-price")).toContainText("R$ 300,00");
+  await page
+    .getByRole("combobox", { name: "Pagamento de Sofá" })
+    .selectOption("installment-8");
+  await expect
+    .poll(
+      () =>
+        saved.items[0].options.find(
+          (option) => option.id === saved.items[0].selected,
+        )?.installments,
+    )
+    .toBe(8);
+  await page
+    .getByRole("combobox", { name: "Pagamento de Sofá" })
+    .selectOption("installment-12");
+  await expect
+    .poll(
+      () =>
+        saved.items[0].options.find(
+          (option) => option.id === saved.items[0].selected,
+        )?.installments,
+    )
+    .toBe(12);
+  await page
+    .getByRole("button", { name: "Adicionar item", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Não tenho link" }).click();
+  await page.getByLabel("Nome do item", { exact: true }).fill(" sofá ");
+  await page
+    .getByRole("button", { name: "Adicionar opção", exact: true })
+    .click();
+  await page.getByText("Editar modelo 1").click();
+  await page.getByLabel("Modelo da opção 1").fill("Modelo reunido");
+  await page.getByLabel("Preço no Pix da opção 1 (R$)").fill("1.000,00");
+  await page.getByRole("button", { name: "Salvar item", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".living-error")).toContainText(
+    "foram reunidas nele",
+  );
+  expect(saved.items).toHaveLength(1);
+  expect(saved.items[0].options).toHaveLength(3);
   await page.screenshot({
     path: "test-results/living-desktop.png",
     fullPage: true,

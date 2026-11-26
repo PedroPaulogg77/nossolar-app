@@ -6,8 +6,48 @@ import {
   purchasesFlow,
   livingSchema,
   emptyLiving,
+  mergeDuplicatePurchase,
 } from "../lib/living";
 describe("orçamento da casa", () => {
+  it("reúne opções de produtos com o mesmo grupo e nome", () => {
+    const existing = {
+      ...newPurchase(),
+      name: "Fogão",
+      group: "Eletrodomésticos" as const,
+      options: [
+        {
+          id: crypto.randomUUID(),
+          name: "Fogão Loja A",
+          price: 1200,
+          store: "Loja A",
+          url: "",
+          photos: [],
+        },
+      ],
+    };
+    const incoming = {
+      ...newPurchase(),
+      name: " fogao ",
+      group: "Eletrodomésticos" as const,
+      options: [
+        {
+          id: crypto.randomUUID(),
+          name: "Fogão Loja B",
+          price: 1300,
+          store: "Loja B",
+          url: "",
+          photos: [],
+        },
+      ],
+    };
+    expect(mergeDuplicatePurchase(existing, incoming)?.options).toHaveLength(2);
+    expect(
+      mergeDuplicatePurchase(existing, {
+        ...incoming,
+        group: "Móveis e eletrodomésticos",
+      }),
+    ).toBeNull();
+  });
   it("soma uma opção escolhida por necessidade e multiplica a quantidade", () => {
     const item = {
       ...newPurchase(),
@@ -102,9 +142,15 @@ describe("orçamento da casa", () => {
     ).toBe(200);
   });
   it("inclui compras para depois da mudança no mês escolhido", () => {
-    const item = {...newPurchase(), name:"Geladeira", priority:"Depois" as const, firstMonth:"2028-01", estimate:2400};
-    const months = purchasesFlow([item],"2027-12",3,"planned").months;
-    expect(months.map(m=>m.total)).toEqual([0,2400,0]);
+    const item = {
+      ...newPurchase(),
+      name: "Geladeira",
+      priority: "Depois" as const,
+      firstMonth: "2028-01",
+      estimate: 2400,
+    };
+    const months = purchasesFlow([item], "2027-12", 3, "planned").months;
+    expect(months.map((m) => m.total)).toEqual([0, 2400, 0]);
   });
   it("rejeita vínculo inexistente e link inválido", () => {
     const item = {

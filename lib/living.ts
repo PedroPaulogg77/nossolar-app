@@ -179,11 +179,45 @@ export const newPurchase = (): Purchase => ({
 export function itemTotal(item: Purchase): number | null {
   const chosen = item.options.find((o) => o.id === item.selected);
   const unit = chosen
-    ? chosen.payment === "Parcelado"
+    ? (chosen.payment || item.payment) === "Parcelado"
       ? (chosen.cardPrice ?? chosen.price)
       : (chosen.pixPrice ?? chosen.price)
     : item.estimate;
   return unit === null ? null : Math.round(unit * item.quantity * 100) / 100;
+}
+const normalizedItemName = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim();
+
+export function mergeDuplicatePurchase(
+  existing: Purchase,
+  incoming: Purchase,
+): Purchase | null {
+  if (
+    existing.id === incoming.id ||
+    existing.group !== incoming.group ||
+    normalizedItemName(existing.name) !== normalizedItemName(incoming.name)
+  )
+    return null;
+  return {
+    ...existing,
+    options: [
+      ...existing.options,
+      ...incoming.options.filter(
+        (option) =>
+          !existing.options.some(
+            (old) =>
+              normalizedItemName(old.name) === normalizedItemName(option.name),
+          ),
+      ),
+    ],
+    estimate: existing.estimate ?? incoming.estimate,
+    photos: existing.photos.length ? existing.photos : incoming.photos,
+    notes: existing.notes || incoming.notes,
+  };
 }
 export function budget(items: Purchase[]) {
   const summarize = (list: Purchase[]) => ({
