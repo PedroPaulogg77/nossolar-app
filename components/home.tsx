@@ -1308,7 +1308,7 @@ export default function Home({
               )}
             </>
           ) : (
-            <LivingPanel area={area} store={living} property={current} />
+            <LivingPanel area={area} store={living} properties={properties} />
           )}
           <footer className="page-footer">
             <span>nosso lar.</span>

@@ -20,6 +20,9 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
   await page
     .getByRole("button", { name: "Adicionar item", exact: true })
     .click();
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:"test-results/living-new-item-mobile.png"});
+  await page.setViewportSize({width:1440,height:1080});
   await page.getByLabel("Nome do item", { exact: true }).fill("Sofá");
   await page.getByLabel("Quantidade", { exact: true }).fill("2");
   await page.getByLabel("Estimativa por unidade").fill("90");
@@ -37,14 +40,19 @@ test("compras, alternativas, imagens, persistência e coleções", async ({
       .click();
     await page.getByLabel(`Modelo da opção ${index}`).fill(`Modelo ${index}`);
     await page.getByLabel(`Preço da opção ${index}`).fill(String(price));
+    await page.getByText("Loja, link e foto").nth(index - 1).click();
     await page
       .getByLabel(`Link da opção ${index}`)
       .fill(`https://example.com/produto-${index}`);
   }
   await page.getByRole("radio", { name: "Escolher esta opção" }).nth(1).check();
+  await page.getByText("Pagamento da estimativa").click();
   await page.getByLabel("Pagamento", { exact: false }).first().selectOption("Parcelado");
   await page.getByLabel("Número de parcelas").fill("3");
   await page.getByLabel("Mês da compra").fill("2026-12");
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:"test-results/living-form-mobile.png",fullPage:true});
+  await page.setViewportSize({width:1440,height:1080});
   await page.getByRole("button", { name: "Salvar item", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".shopping-price")).toContainText("R$ 300,00");
