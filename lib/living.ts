@@ -6,6 +6,10 @@ export const groups = [
   "Enxoval",
   "Supermercado",
   "Serviços",
+  "Eletrodomésticos",
+  "Decoração e iluminação",
+  "Organização e limpeza",
+  "Outros",
 ] as const;
 export const priorities = [
   "Para a mudança",
@@ -44,9 +48,14 @@ export const optionSchema = z.object({
   url: linkSchema,
   price,
   photos,
+  model: z.string().max(100).optional(),
+  notes: z.string().max(2000).optional(),
   payment: z.enum(["À vista", "Parcelado"]).optional(),
   installments: z.number().int().min(1).max(120).optional(),
-  firstMonth: z.string().regex(/^$|^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+  firstMonth: z
+    .string()
+    .regex(/^$|^\d{4}-(0[1-9]|1[0-2])$/)
+    .optional(),
 });
 export const itemSchema = z
   .object({
@@ -57,6 +66,16 @@ export const itemSchema = z
     group: z.enum(groups),
     room: z.string().max(80),
     priority: z.enum(priorities),
+    moment: z
+      .enum([
+        "Antes das chaves",
+        "Na mudança",
+        "Depois da mudança",
+        "Só uma ideia",
+        "Já temos",
+        "Descartado",
+      ])
+      .optional(),
     purchased: z.boolean(),
     notes: z.string().max(5000),
     options: z.array(optionSchema).max(30),
@@ -89,7 +108,10 @@ export const livingSchema = z
   .object({
     revision: z.number().int().nonnegative(),
     futureReserve: price.default(null),
-    moveMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).default("2027-12"),
+    moveMonth: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+      .default("2027-12"),
     limitEnabled: z.boolean().default(false),
     monthlyLimit: price.default(null),
     items: z.array(itemSchema).max(500),
@@ -138,6 +160,7 @@ export const newPurchase = (): Purchase => ({
   group: groups[0],
   room: "",
   priority: "Para a mudança",
+  moment: "Na mudança",
   purchased: false,
   notes: "",
   options: [],
@@ -167,15 +190,31 @@ export function budget(items: Purchase[]) {
     upfront: summarize(immediate.filter((i) => i.payment === "À vista")),
   };
 }
-export function purchasesFlow(items: Purchase[], start: string, count = 12, mode: "all" | "planned" | "bought" = "all") {
-  const planned = items.filter((i) => i.priority === "Para a mudança");
-  const included = planned.filter(i => mode === "all" || (mode === "bought" ? i.purchased : !i.purchased));
+export function purchasesFlow(
+  items: Purchase[],
+  start: string,
+  count = 12,
+  mode: "all" | "planned" | "bought" = "all",
+) {
+  const planned = items.filter(
+    (i) => i.priority === "Para a mudança" || i.priority === "Depois",
+  );
+  const included = planned.filter(
+    (i) => mode === "all" || (mode === "bought" ? i.purchased : !i.purchased),
+  );
   const index = (date: string) =>
     Number(date.slice(0, 4)) * 12 + Number(date.slice(5)) - 1;
   const startIndex = index(start);
   return {
     pending: included
-      .filter((i) => itemTotal(i) === null || !(i.options.find(o => o.id === i.selected)?.firstMonth || i.firstMonth))
+      .filter(
+        (i) =>
+          itemTotal(i) === null ||
+          !(
+            i.options.find((o) => o.id === i.selected)?.firstMonth ||
+            i.firstMonth
+          ),
+      )
       .map((i) => i.name),
     months: Array.from({ length: count }, (_, offset) => {
       const n = startIndex + offset;
@@ -183,10 +222,13 @@ export function purchasesFlow(items: Purchase[], start: string, count = 12, mode
       let cents = 0;
       for (const item of included) {
         const total = itemTotal(item);
-        const option = item.options.find(o => o.id === item.selected);
+        const option = item.options.find((o) => o.id === item.selected);
         const firstMonth = option?.firstMonth || item.firstMonth;
         if (total === null || !firstMonth) continue;
-        const payments = (option?.payment || item.payment) === "Parcelado" ? (option?.installments || item.installments) : 1;
+        const payments =
+          (option?.payment || item.payment) === "Parcelado"
+            ? option?.installments || item.installments
+            : 1;
         const delta = n - index(firstMonth);
         if (delta >= 0 && delta < payments) {
           const totalCents = Math.round(total * 100),

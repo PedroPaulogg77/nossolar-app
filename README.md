@@ -100,3 +100,9 @@ Os novos módulos salvam diretamente na conta. Use Atualizar ao trocar de aparel
 
 Validação: testes de cálculos e de persistência SQL com RLS em PGlite; testes de navegador com respostas Supabase simuladas, cadastro, alternativas, imagens, coleções, persistência e layout móvel. Os testes locais não substituem a confirmação de acesso na conta real.
 Planejamento mensal: execute também `supabase/005_living_planning.sql` após 004. A previsão de mudança começa em dezembro de 2027 e pode ser editada. O limite mensal é opcional e desligado por padrão. A simulação soma imóvel, compras confirmadas e opções planejadas; a visão Comprado mostra apenas compromissos efetivos. Cada alternativa pode ter mês e parcelamento próprios.
+
+## Produtos com IA
+
+Ao adicionar uma compra, escolha primeiro entre colar o link/texto/HTML do anúncio e cadastrar manualmente. A rota `/api/import-product` usa o provedor já configurado para imóveis, o mesmo login e a mesma cota de importações concluídas. O resultado é revisável: nome curto na lista, título completo, código do modelo, loja, preço explícito e características úteis para comparar. Links bloqueados exigem texto copiado da página. Não inferimos preços ou especificações ausentes. A foto pode ser colada com Ctrl+V na área de foto do modelo; páginas que bloqueiam imagens não são contornadas automaticamente.
+
+O cadastro mantém rascunho sem fotos por até sete dias no navegador atual. Cada opção de produto guarda preço, link, código do modelo, observações e condições próprias. A comparação reúne as opções em uma lista comparável na ficha. As categorias incluem também eletrodomésticos, decoração e iluminação, organização e limpeza e outros. Antes das chaves e na mudança entram na projeção por mês; depois da mudança entra no mês escolhido; ideias, itens que já temos e descartados ficam fora das contas.

@@ -54,7 +54,11 @@ describe("orçamento da casa", () => {
       firstMonth: "2026-12",
     };
     const flow = purchasesFlow(
-      [item, { ...item, priority: "Desejo" }, { ...item, priority: "Depois" }],
+      [
+        item,
+        { ...item, priority: "Desejo" },
+        { ...item, priority: "Depois", firstMonth: "2027-12" },
+      ],
       "2026-11",
     );
     expect(flow.months.slice(0, 5).map((m) => m.total)).toEqual([
@@ -66,10 +70,41 @@ describe("orçamento da casa", () => {
   });
   it("separa simulação e compra e usa parcelas da opção escolhida", () => {
     const selected = crypto.randomUUID();
-    const item = {...newPurchase(), name:"Geladeira", estimate:3000, firstMonth:"2027-12", options:[{id:selected,name:"Compacta",store:"",url:"",price:2400,photos:[],payment:"Parcelado" as const,installments:12,firstMonth:"2027-12"}],selected};
-    expect(purchasesFlow([item],"2027-12",2,"planned").months.map(m=>m.total)).toEqual([200,200]);
-    expect(purchasesFlow([item],"2027-12",2,"bought").months[0].total).toBe(0);
-    expect(purchasesFlow([{...item,purchased:true}],"2027-12",2,"bought").months[0].total).toBe(200);
+    const item = {
+      ...newPurchase(),
+      name: "Geladeira",
+      estimate: 3000,
+      firstMonth: "2027-12",
+      options: [
+        {
+          id: selected,
+          name: "Compacta",
+          store: "",
+          url: "",
+          price: 2400,
+          photos: [],
+          payment: "Parcelado" as const,
+          installments: 12,
+          firstMonth: "2027-12",
+        },
+      ],
+      selected,
+    };
+    expect(
+      purchasesFlow([item], "2027-12", 2, "planned").months.map((m) => m.total),
+    ).toEqual([200, 200]);
+    expect(purchasesFlow([item], "2027-12", 2, "bought").months[0].total).toBe(
+      0,
+    );
+    expect(
+      purchasesFlow([{ ...item, purchased: true }], "2027-12", 2, "bought")
+        .months[0].total,
+    ).toBe(200);
+  });
+  it("inclui compras para depois da mudança no mês escolhido", () => {
+    const item = {...newPurchase(), name:"Geladeira", priority:"Depois" as const, firstMonth:"2028-01", estimate:2400};
+    const months = purchasesFlow([item],"2027-12",3,"planned").months;
+    expect(months.map(m=>m.total)).toEqual([0,2400,0]);
   });
   it("rejeita vínculo inexistente e link inválido", () => {
     const item = {
