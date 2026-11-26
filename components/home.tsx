@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseLocalizedNumber } from "@/lib/localized-number";
 import { Field } from "@/components/property-field";
 import {
@@ -69,6 +69,9 @@ import {
   type Attachment,
 } from "@/lib/attachment-types";
 const STORAGE = "nosso-lar-v1";
+const SYNC_KEY = "nosso-lar-shared-snapshot-v1";
+const sharedSnapshot = (properties: Property[], preferences: Preferences) =>
+  JSON.stringify({ version: 1, properties, preferences });
 const aiGroups = [
   {
     title: "O imóvel",
@@ -206,7 +209,12 @@ export default function Home({
     [aiUrl, setAiUrl] = useState(""),
     [aiImage, setAiImage] = useState<File | null>(null),
     [aiImageUrl, setAiImageUrl] = useState(""),
-    [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
+    [aiPreview, setAiPreview] = useState<AiPreview | null>(null),
+    [welcomeOpen, setWelcomeOpen] = useState(false);
+  const cloudBaseline = useRef<string | null>(null);
+  const cloudEnabled = useRef(false);
+  const latestLocal = useRef<string | null>(null);
+  const syncQueue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     if (!aiImage) return;
     const url = URL.createObjectURL(aiImage);
@@ -214,10 +222,27 @@ export default function Home({
     return () => URL.revokeObjectURL(url);
   }, [aiImage]);
   useEffect(() => {
+    if (user && ready)
+      setWelcomeOpen(
+        localStorage.getItem(`nosso-lar-intro-${user.toLowerCase()}`) !==
+          "seen",
+      );
+  }, [user, ready]);
+  const dismissWelcome = () => {
+    if (user)
+      localStorage.setItem(`nosso-lar-intro-${user.toLowerCase()}`, "seen");
+    setWelcomeOpen(false);
+  };
+  useEffect(() => {
+    let active = true;
+    let localData: { properties: Property[]; preferences: Preferences } | null =
+      null;
     try {
       const raw = localStorage.getItem(STORAGE);
       if (raw) {
         const data = backupSchema.parse(JSON.parse(raw));
+        localData = data;
+        latestLocal.current = sharedSnapshot(data.properties, data.preferences);
         setProperties(data.properties);
         setPrefs(data.preferences);
       } else setProperties([]);
@@ -226,23 +251,167 @@ export default function Home({
         "Não foi possível ler os dados locais. Importe um backup; o arquivo original foi preservado.",
       );
     }
-    setReady(true);
-    supabase?.auth
-      .getUser()
-      .then(({ data }) => setUser(data.user?.email ?? ""));
+    async function openSharedSpace() {
+      try {
+        if (!supabase) return;
+        const { data: session } = await supabase.auth.getUser();
+        if (!active || !session.user) return;
+        setUser(session.user.email ?? "");
+        const { data, error } = await supabase.rpc("load_household");
+        if (error) throw error;
+        if (!active) return;
+        const remote = data ? backupSchema.parse(data) : null;
+        const remoteSnapshot = remote
+          ? sharedSnapshot(remote.properties, remote.preferences)
+          : null;
+        const localSnapshot = localData
+          ? sharedSnapshot(localData.properties, localData.preferences)
+          : null;
+        cloudBaseline.current = remoteSnapshot;
+        const remembered = localStorage.getItem(SYNC_KEY);
+        if (remote && !localData) {
+          localStorage.setItem(STORAGE, remoteSnapshot!);
+          localStorage.setItem(SYNC_KEY, remoteSnapshot!);
+          latestLocal.current = remoteSnapshot;
+          setProperties(remote.properties);
+          setPrefs(remote.preferences);
+          cloudEnabled.current = true;
+        } else if (remote && localData && remoteSnapshot !== localSnapshot) {
+          if (remembered === localSnapshot) {
+            localStorage.setItem(STORAGE, remoteSnapshot!);
+            localStorage.setItem(SYNC_KEY, remoteSnapshot!);
+            latestLocal.current = remoteSnapshot;
+            setProperties(remote.properties);
+            setPrefs(remote.preferences);
+            cloudEnabled.current = true;
+          } else if (remembered === remoteSnapshot) {
+            cloudEnabled.current = true;
+            enqueueShared(localData.properties, localData.preferences);
+          } else {
+            setNotice(
+              "Há versões diferentes dos imóveis neste aparelho e na conta. Abra Preferências para escolher qual guardar.",
+            );
+          }
+        } else {
+          cloudEnabled.current = true;
+          if (remoteSnapshot) localStorage.setItem(SYNC_KEY, remoteSnapshot);
+          if (!remote && localData)
+            enqueueShared(localData.properties, localData.preferences);
+        }
+      } catch {
+        if (active)
+          setNotice(
+            "Não conseguimos atualizar os imóveis da conta agora. A cópia deste aparelho está preservada.",
+          );
+      } finally {
+        if (active) setReady(true);
+      }
+    }
+    void openSharedSpace();
     const sub = supabase?.auth.onAuthStateChange((_event, session) =>
       setUser(session?.user.email ?? ""),
     );
-    return () => sub?.data.subscription.unsubscribe();
+    return () => {
+      active = false;
+      sub?.data.subscription.unsubscribe();
+    };
+  }, []);
+  async function syncShared(ps: Property[], pr: Preferences) {
+    if (!supabase || !cloudEnabled.current) return;
+    const { data: current, error: loadError } =
+      await supabase.rpc("load_household");
+    if (loadError) throw loadError;
+    const parsed = current ? backupSchema.parse(current) : null;
+    const actual = parsed
+      ? sharedSnapshot(parsed.properties, parsed.preferences)
+      : null;
+    if (actual !== cloudBaseline.current) {
+      cloudEnabled.current = false;
+      setNotice(
+        "Os imóveis mudaram em outro aparelho. Abra Preferências para atualizar antes de salvar novamente na conta.",
+      );
+      return;
+    }
+    const { data: householdId, error: accessError } =
+      await supabase.rpc("ensure_household");
+    if (accessError || !householdId)
+      throw Error("Não conseguimos compartilhar os imóveis agora.");
+    const synced = await syncFiles(ps, householdId);
+    const { error } = await supabase.rpc("save_household", {
+      payload: { version: 1, properties: synced, preferences: pr },
+    });
+    if (error) throw error;
+    cloudBaseline.current = sharedSnapshot(synced, pr);
+    localStorage.setItem(SYNC_KEY, cloudBaseline.current);
+    if (latestLocal.current === sharedSnapshot(ps, pr)) {
+      localStorage.setItem(STORAGE, cloudBaseline.current);
+      latestLocal.current = cloudBaseline.current;
+      setProperties(synced);
+    }
+  }
+  function enqueueShared(ps: Property[], pr: Preferences) {
+    syncQueue.current = syncQueue.current
+      .catch(() => {})
+      .then(() => syncShared(ps, pr))
+      .catch(() => {
+        setNotice(
+          "Os imóveis ficaram salvos neste aparelho, mas não conseguimos compartilhá-los agora. Tente novamente em Preferências.",
+        );
+      });
+  }
+  useEffect(() => {
+    let refreshing = false;
+    async function refreshShared() {
+      if (
+        refreshing ||
+        document.visibilityState !== "visible" ||
+        !supabase ||
+        !cloudEnabled.current
+      )
+        return;
+      refreshing = true;
+      try {
+        await syncQueue.current;
+        const { data, error } = await supabase.rpc("load_household");
+        if (error || !data) return;
+        const remote = backupSchema.parse(data);
+        const snapshot = sharedSnapshot(remote.properties, remote.preferences);
+        if (snapshot !== cloudBaseline.current) {
+          if (latestLocal.current !== cloudBaseline.current) {
+            cloudEnabled.current = false;
+            setNotice(
+              "Os imóveis mudaram em outro aparelho enquanto você editava. Abra Preferências para escolher a versão.",
+            );
+            return;
+          }
+          localStorage.setItem(STORAGE, snapshot);
+          localStorage.setItem(SYNC_KEY, snapshot);
+          latestLocal.current = snapshot;
+          cloudBaseline.current = snapshot;
+          setProperties(remote.properties);
+          setPrefs(remote.preferences);
+        }
+      } catch {
+        // Keep the local copy available while the connection recovers.
+      } finally {
+        refreshing = false;
+      }
+    }
+    window.addEventListener("focus", refreshShared);
+    document.addEventListener("visibilitychange", refreshShared);
+    return () => {
+      window.removeEventListener("focus", refreshShared);
+      document.removeEventListener("visibilitychange", refreshShared);
+    };
   }, []);
   const persist = (ps: Property[], pr = prefs) => {
     try {
-      localStorage.setItem(
-        STORAGE,
-        JSON.stringify({ version: 1, properties: ps, preferences: pr }),
-      );
+      const snapshot = sharedSnapshot(ps, pr);
+      localStorage.setItem(STORAGE, snapshot);
+      latestLocal.current = snapshot;
       setProperties(ps);
       setPrefs(pr);
+      if (cloudEnabled.current) enqueueShared(ps, pr);
       return true;
     } catch {
       setNotice(
@@ -332,7 +501,13 @@ export default function Home({
           payload: { version: 1, properties: synced, preferences: prefs },
         });
         if (error) throw error;
-        persist(synced);
+        const snapshot = sharedSnapshot(synced, prefs);
+        localStorage.setItem(STORAGE, snapshot);
+        latestLocal.current = snapshot;
+        cloudBaseline.current = snapshot;
+        localStorage.setItem(SYNC_KEY, snapshot);
+        cloudEnabled.current = true;
+        setProperties(synced);
         setNotice("Cópia salva na sua conta.");
       } else {
         const { data, error } = await supabase.rpc("load_household");
@@ -344,7 +519,17 @@ export default function Home({
             "Trazer os imóveis e preferências que guardamos na conta? Isso substitui a versão deste aparelho.",
           )
         ) {
-          persist(parsed.properties, parsed.preferences);
+          const snapshot = sharedSnapshot(
+            parsed.properties,
+            parsed.preferences,
+          );
+          localStorage.setItem(STORAGE, snapshot);
+          latestLocal.current = snapshot;
+          cloudBaseline.current = snapshot;
+          localStorage.setItem(SYNC_KEY, snapshot);
+          cloudEnabled.current = true;
+          setProperties(parsed.properties);
+          setPrefs(parsed.preferences);
           setNotice("Cópia da nuvem carregada.");
         }
       }
@@ -601,6 +786,67 @@ export default function Home({
                 <>
                   {tab === "Imóveis" && (
                     <>
+                      {welcomeOpen && (
+                        <section
+                          className="welcome-panel"
+                          aria-label="Comece por aqui"
+                        >
+                          <div>
+                            <span className="eyebrow">COMECE POR AQUI</span>
+                            <h2>
+                              {properties.length
+                                ? "Conheça o que já guardamos"
+                                : "Vamos começar nossa lista"}
+                            </h2>
+                            <p>
+                              {properties.length
+                                ? "Abra um imóvel para ver a proposta, as fotos e o que anotamos."
+                                : "Guarde um imóvel ou explore as ideias de compras para a casa."}
+                            </p>
+                          </div>
+                          <div className="welcome-actions">
+                            <button
+                              className="primary"
+                              onClick={() => {
+                                dismissWelcome();
+                                open(
+                                  properties.length
+                                    ? (properties.find((p) => p.favorite) ??
+                                        properties[0])
+                                    : newProperty(),
+                                  !properties.length,
+                                );
+                              }}
+                            >
+                              {properties.length
+                                ? "Ver um imóvel"
+                                : "Adicionar imóvel"}
+                            </button>
+                            <button
+                              className="secondary"
+                              onClick={() => {
+                                dismissWelcome();
+                                setArea(
+                                  properties.length
+                                    ? "Mobília"
+                                    : "Lista inicial",
+                                );
+                              }}
+                            >
+                              {properties.length
+                                ? "Ver compras da casa"
+                                : "Explorar lista da casa"}
+                            </button>
+                            <button
+                              className="text-button"
+                              onClick={dismissWelcome}
+                              aria-label="Fechar orientação"
+                            >
+                              Fechar
+                            </button>
+                          </div>
+                        </section>
+                      )}
                       <div className="collection-title">
                         <h2>
                           Nossa lista{" "}

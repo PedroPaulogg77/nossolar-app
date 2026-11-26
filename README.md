@@ -28,8 +28,8 @@ Os imóveis criados pelos testes são dados de teste isolados, nunca conteúdo i
 - **Imóveis:** o primeiro acesso começa vazio, sem imóveis ou valores fictícios. Cadastro, edição, favoritos, status e checklist. A fase do imóvel tem filtro próprio (Pronto, Em obra, Na planta ou A confirmar), separado do andamento da avaliação, e aparece no card. Cidade e bairro separados geram filtros somente quando há opções; bairros são filtrados pela cidade. O link original fica na ficha e pode ser aberto pelo card. Destaques factuais do anúncio ficam separados das anotações pessoais. Valores antigos são preservados sem inferir a separação.
 - **Anexos por imóvel:** fotos, planos de pagamento e documentos. PDF, JPG, PNG, WebP, DOCX e XLSX; até 10 MB/arquivo, 20 arquivos/imóvel e 100 MB referenciados no espaço. É possível colar uma foto com Ctrl+V na ficha ou na importação com IA; a primeira foto anexada pode ser a capa. Anexos não são enviados para IA. A cópia JSON inclui os bytes dos arquivos e pode ser restaurada em outro navegador.
 - **Comparar:** duas ou três opções; métricas sem preencher desconhecidos com zero; nota consensual ponderada e requisitos configuráveis.
-- **Finanças:** entrada em dinheiro informada diretamente, parte à vista e parte parcelada, reserva atual editável e diferença para entrada/documentação/gastos eventuais; prestação real informada, condomínio, IPTU anual dividido por 12, obra fixa com vigência e fluxo interativo de 12 meses. Valores antigos de FGTS e subsídio continuam preservados nos dados, sem campos na interface.
-- **Preferências:** renda, teto, requisitos, pesos, exportação/importação JSON e cópia manual na nuvem.
+- **Finanças:** entrada simples ou em etapas com datas e parcelas próprias, reserva atual editável, prestação informada, condomínio, IPTU anual dividido por 12, obra fixa com vigência e três períodos navegáveis de 12 meses. Valores antigos de FGTS e subsídio continuam preservados nos dados, sem campos na interface.
+- **Preferências:** renda, teto, requisitos, pesos, exportação/importação JSON e escolha da versão em caso de conflito entre aparelhos.
 
 Veja `docs/DESIGN.md` para arquitetura, wireframes textuais e tokens.
 
@@ -40,15 +40,14 @@ Veja `docs/DESIGN.md` para arquitetura, wireframes textuais e tokens.
 3. Copie `.env.example` para `.env.local`. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` com URL e chave pública publishable (ou anon). Nunca use `service_role`. Segredos e arquivos `*.local.sql` não são versionados.
 4. Em Authentication → URL Configuration, use `https://larpedroevivian.vercel.app` em **Site URL**. Em **Redirect URLs**, adicione `https://larpedroevivian.vercel.app` e `http://127.0.0.1:3000` para testes locais. Ative login por e-mail/magic link. Limites do serviço gratuito podem impedir envio; não adicione SMTP pago.
 5. Cadastre os dois usuários em Authentication → Users e configure seus e-mails. O app usa `shouldCreateUser: false` e não oferece cadastro público. Recomenda-se desativar novos cadastros em Auth após criar os dois usuários.
-6. Reinicie. Preferências → Nossa conta e outros aparelhos → receba o link. **Guardar na nossa conta** envia registros e anexos; **Trazer da nossa conta** recupera os imóveis. Arquivos são baixados de forma autenticada ao abrir.
+6. Reinicie e entre pelo link recebido por e-mail. Imóveis e compras da casa são carregados da conta automaticamente. Preferências mantém as ações **Guardar na nossa conta** e **Trazer da nossa conta** para resolver versões divergentes. Arquivos são baixados de forma autenticada ao abrir.
 
-Os dois e-mails autorizados compartilham um único household, criado de forma serializada. A sincronização é explícita: traga a versão da conta antes de editar em outro aparelho e guarde as mudanças depois. Não há mesclagem automática de edições simultâneas. Falhas na conta não apagam os dados locais.
+Os dois e-mails autorizados compartilham um único household. Na primeira visita de um aparelho sem cópia local, os imóveis aparecem da conta. Novas edições são compartilhadas automaticamente e a aba atualiza os dados ao receber foco. Se uma cópia local e a conta divergirem sem uma versão anterior conhecida, o app preserva ambas e pede uma escolha em Preferências. Não há mesclagem de edições simultâneas do mesmo imóvel. Falhas de conexão não apagam os dados locais.
 
 O bucket `nosso-lar-private` é privado. As políticas autorizam somente os dois membros a ler ou escrever seus arquivos; não são geradas URLs públicas. Remover um anexo o desvincula da ficha; cópias já armazenadas podem permanecer para recuperação. Backups exportados anteriormente conservam seus arquivos. Não há scraping, geocodificação ou mapas.
 
 Antes de disponibilizar a conta, valide RLS: os dois membros compartilham dados; uma terceira conta e anônimos não podem ler nem escrever registros ou anexos. O teste local em PGlite executa as migrações e verifica esses casos. Isso não substitui a verificação no projeto real.
 
-**Estado da configuração:** a conexão pública do projeto respondeu, mas a tabela `households` ainda não existia na última verificação. O SQL não foi aplicado ao projeto real: o controle do navegador foi interrompido por não conseguir confirmar sua URL. A conexão PostgreSQL fornecida contém um placeholder de senha. Execute o script local no SQL Editor para liberar conta e arquivos entre aparelhos.
 
 ## Gemini opcional
 
